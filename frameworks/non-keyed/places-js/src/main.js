@@ -22,7 +22,7 @@ class Store extends DataStore {
         var newData = [...this.getStoreData().data];
 
         for (let i = 0; i < newData.length; i += 10) {
-            newData[i] = {...newData[i], label:newData[i].label + '!!!'};
+            newData[i] = {...newData[i], label:newData[i].label + ' !!!'};
         }
         this.updateStoreData({data:newData});
     }
@@ -154,7 +154,7 @@ export class MainElement extends BaseDynamicComponent {
   
   render(data){
     const rows = data.data;
-    const html = `<link href="/css/currentStyle.css" rel="stylesheet"/>
+    const html = `
         <div class="container">
             <div class="jumbotron">
                 <div class="row">
