@@ -298,24 +298,51 @@ class BaseDynamicComponent extends HTMLElement {
         //TODO: Handle case where field is not an array
         // This logic is not going to work in that case
         const parser = new DOMParser();
-        const parsed = parser.parseFromString(this[templateFunc]());
-        this.#templateCache[templateField] = createdTemplate;
+        
+        const templateInfo = parser.parseFromString(this[templateFunc]());
+        
+        let dataToCache = {}
+        if(Array.isArray(templateInfo)){ 
+          const parsed = parser.parseFromString(templateInfo[0]);
+          dataToCache = {
+            template: parsed,
+            config: parsed[1] 
+          }
+        } else {
+          dataToCache = {
+            template: parsed
+          }
+        }
+        
+        this.#templateCache[templateField] = dataToCache
       }
       
       //TODO: Only render new template if the data changed.
        
       let itemsToRender = [];
       for(let j=0;j<data[templateField.length];j++){
-        const templateToRender = this.#templateCache[templateField].cloneNode(true);
+        const templateToRender = this.#templateCache[templateField][template].cloneNode(true);
         const updates = templateToRender.getRootNode().querySelectorAll("*[data-attr]");
+        
+        let derivedFields = {};
+        let derivedConfig = templateToRender?.config?.derived;
+        if(derivedConfig){
+          Object.keys(derivedConfig).forEach(key=>{
+            const value = derivedConfig[key](data.templateField[i],data);
+          }
+        }
+
         for(let k=0;k<updates.length;k++){
           const kUpdate = updates[k];
-          const dataField = kUpdate.getAttribute("data-field");
-          const dataAttr = kUpdate.getAttribute("data-attr");
-          
-          const updateData = data[templateField][dataField];
-          kUpdate[dataAttr] = updateData;
-          
+          const dataFields = kUpdate.getAttribute("data-fields");
+          const dataAttrs = kUpdate.getAttribute("data-attrs");
+         
+          const dataFieldList = dataFields.split(",");
+          const dataAttrsList = dataAttrs.split(",");
+          for(let l=0;l<dataFieldList.length;l++){
+            kUpdate[dataAttrsList[i]] = data[templateField][dataFieldList[i]];
+          }
+           
           //TODO: Handle case where data item is an array of numbers or
           // strings.  
         }

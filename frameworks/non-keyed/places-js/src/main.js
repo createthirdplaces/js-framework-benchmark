@@ -149,8 +149,6 @@ export class MainElement extends BaseDynamicComponent {
 
     });
   }
-
- 
   
   render(data){
     const rows = data.data;
@@ -186,27 +184,60 @@ export class MainElement extends BaseDynamicComponent {
                 </div>
             </div>
             <table class="table table-hover table-striped test-data" >
-                <tbody>${rows.map(item => `
-                <tr id=${item.id} class=${data.selected == item.id ? 'danger' : ''}>
-                    <td class="col-md-1">${item.id}</td>
-                    <td class="col-md-4">
-                    <a data-action="select" data-id=${item.id}>${item.label}</a>
-                    </td>
-                    <td class="col-md-1">
-                    <a>
-                        <span class="glyphicon glyphicon-remove" aria-hidden="true"
-                            data-action="remove" data-id=${item.id}></span>
-                    </a>
-                    </td>
-                    <td class="col-md-6"></td>
-                </tr>`).join("")}
-                </tbody>
+              <tbody 
+                data-field="rows" 
+                data-template="displayRows"
+
+              >
+              </tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
         </div>`;
         return html;
     }
-
+    
+  displayRows(){
+    return [`
+      <tr 
+        id=${item.id} 
+        data-fields="id, selectedClass"
+        data-attrs="id, class"
+      >
+          <td 
+            class="col-md-1"
+            data-fields="id"
+            data-attrs="textContent"
+          >
+          </td>
+          <td class="col-md-4">
+          <a 
+              data-action="select" 
+              data-fields="id,label"
+              data-attrs="data-id,textContent"
+              >
+            </a>
+            </td>
+            <td class="col-md-1">
+            <a>
+              <span class="glyphicon glyphicon-remove" aria-hidden="true"
+                  data-action="remove" 
+                  data-fields="id"
+                  data-attr="data-id"
+              ></span>
+            </a>
+            </td>
+            <td class="col-md-6"></td>
+        </tr>`,
+        {
+          derived:{
+            "isSelected":(item,data) =>{
+              return data.selected === item.id ? 'danger', :''
+            }
+          }
+        }
+      ]
+    }
+    
     add() {
         store.add();
     }
