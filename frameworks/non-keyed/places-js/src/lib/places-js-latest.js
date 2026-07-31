@@ -252,8 +252,9 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
+  #nodeCache = {};
+  #prevNodeState {};
   #templateCache = {};
-  #prevState = {};
 
   #generateAndSaveHTML(data) {
 
@@ -306,11 +307,11 @@ class BaseDynamicComponent extends HTMLElement {
           const parsed = parser.parseFromString(templateInfo[0]);
           dataToCache = {
             template: parsed,
-            config: parsed[1] 
+            config: parsed[1],
           }
         } else {
           dataToCache = {
-            template: parsed
+            template: parsed,
           }
         }
         
@@ -321,38 +322,72 @@ class BaseDynamicComponent extends HTMLElement {
        
       let itemsToRender = [];
       for(let j=0;j<data[templateField.length];j++){
-        const templateToRender = this.#templateCache[templateField][template].cloneNode(true);
-        const updates = templateToRender.getRootNode().querySelectorAll("*[data-attr]");
-        
+       
         let derivedFields = {};
         let derivedConfig = templateToRender?.config?.derived;
         if(derivedConfig){
           Object.keys(derivedConfig).forEach(key=>{
             const value = derivedConfig[key](data.templateField[i],data);
+            derivedFields[key]=value;
           }
         }
 
-        for(let k=0;k<updates.length;k++){
-          const kUpdate = updates[k];
-          const dataFields = kUpdate.getAttribute("data-fields");
-          const dataAttrs = kUpdate.getAttribute("data-attrs");
-         
-          const dataFieldList = dataFields.split(",");
-          const dataAttrsList = dataAttrs.split(",");
-          for(let l=0;l<dataFieldList.length;l++){
-            kUpdate[dataAttrsList[i]] = data[templateField][dataFieldList[i]];
+
+        let allEqual = true;
+
+        let nextState = {};
+        const nodePrevState = this.#prevNodeState(data[templateField[i].id);
+        Object.keys(derivedFields).forEach((key)=>{
+          if(!(derivedFields(key) === prevState(key))){
+            allEqual = false;
           }
-           
-          //TODO: Handle case where data item is an array of numbers or
-          // strings.  
+          nextState[key] =  derivedFields(key);
+        });
+        
+        if(!Object.is(data.templateField,prevState.templateField){
+          allEqual = false;
         }
-        itemToRender.push(templateToRender);
+        nextState[templateField] = data.templateField;
+       
+        //Use old node if there is no state change.
+        if(allEqual) {
+          itemToRender.push(nodeToRender);
+        }
+        else { 
+          const nodeToRender = this.#templateCache[templateField][template].cloneNode(true);
+          const updates = templateToRender.getRootNode().querySelectorAll("*[data-attr]");
+          
+
+          for(let k=0;k<updates.length;k++){
+            const kUpdate = updates[k];
+            const dataFields = kUpdate.getAttribute("data-fields");
+            const dataAttrs = kUpdate.getAttribute("data-attrs");
+           
+            const dataFieldList = dataFields.split(",");
+            const dataAttrsList = dataAttrs.split(",");
+            for(let l=0;l<dataFieldList.length;l++){
+              kUpdate[dataAttrsList[i]] = 
+                data[templateField][dataFieldList[i]] || derivedConfig[dataFieldList[i];
+            }
+             
+            //TODO: Handle case where data item is an array of numbers or
+            // strings.  
+          }
+          
+          // Cache node if it has an id;
+        
+          const cacheId = templateField[i].id
+          if (cacheId && cacheId.length > 0){
+            this.#nodeCache[cacheId] = nodeToRender; 
+            this.#prevNodeState[cacheId] = nextState; 
+          }
+          itemToRender.push(nodeToRender);
+        }
       }
       
       //TODO: Handle case where field is not an array.
       item.replaceChildren(itemsToRender);
     }
-    this.#prevState = data;
   }
 }
 

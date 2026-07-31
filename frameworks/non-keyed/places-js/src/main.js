@@ -199,7 +199,6 @@ export class MainElement extends BaseDynamicComponent {
   displayRows(){
     return [`
       <tr 
-        id=${item.id} 
         data-fields="id, selectedClass"
         data-attrs="id, class"
       >
