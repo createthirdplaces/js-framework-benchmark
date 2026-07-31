@@ -294,31 +294,36 @@ class BaseDynamicComponent extends HTMLElement {
       const templateField = item.getAttribute("data-field");
     
       if (!(templateField in this.#templateCache)){
-        const createdTempate = document.createElement("div");
-        createdTemplate.innerHTML = this[templateFunc]();
-        this.#templateCache[templateField] = createdTemplate; 
+       
+        //TODO: Handle case where field is not an array
+        // This logic is not going to work in that case
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(this[templateFunc]());
+        this.#templateCache[templateField] = createdTemplate;
       }
-      //Only render new template if the data changed.
-      if(!Object.is(this.#prevState[templateField],data[templateField])){
-        
-        for(let j=0;j<data[templateField.length];j++){
-          const templateToRender = this.#templateCache[templateField].cloneNode(true);
-          const updates = templateToRender.getRootNode().querySelectorAll("*[data-attr]");
-          for(let k=0;k<updates.length;k++){
-            const kUpdate = updates[k];
-            const dataField = kUpdate.getAttribute("data-field");
-            const dataAttr = kUpdate.getAttribute("data-attr");
-            
-            const updateData = data[templateField][dataField];
-            kUpdate[dataAttr] = updateData;
-            
-            //TODO: Handle case where data item is an array of numbers or
-            // strings.  
-          //TODO: Handle case where field is not an array.
-          }
-          item.appendChild(templateToRender);
+      
+      //TODO: Only render new template if the data changed.
+       
+      let itemsToRender = [];
+      for(let j=0;j<data[templateField.length];j++){
+        const templateToRender = this.#templateCache[templateField].cloneNode(true);
+        const updates = templateToRender.getRootNode().querySelectorAll("*[data-attr]");
+        for(let k=0;k<updates.length;k++){
+          const kUpdate = updates[k];
+          const dataField = kUpdate.getAttribute("data-field");
+          const dataAttr = kUpdate.getAttribute("data-attr");
+          
+          const updateData = data[templateField][dataField];
+          kUpdate[dataAttr] = updateData;
+          
+          //TODO: Handle case where data item is an array of numbers or
+          // strings.  
         }
-      } 
+        itemToRender.push(templateToRender);
+      }
+      
+      //TODO: Handle case where field is not an array.
+      item.replaceChildren(itemsToRender);
     }
     this.#prevState = data;
   }
