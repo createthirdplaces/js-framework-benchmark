@@ -146,11 +146,11 @@ class BaseDynamicComponent extends HTMLElement {
 
   static templates = {};
   static templateCache = {};
-  static prevStateMap = {}; 
+  static prevState = {}; 
 
   static defineTemplate(templateFunc, templateName){
-    templates[templateName.toUpperCase()] = templateFunc;
-    templateCache[templateName.toUpperCase()] = {};
+    BaseDynamicComponent.templates[templateName.toUpperCase()] = templateFunc;
+    BaseDynamicComponent.templateCache[templateName.toUpperCase()] = {};
   }
 
 	/**
@@ -261,55 +261,46 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-  #renderTemplates(data) {
-    const templates = this.getRootNode().querySelectorAll("data-template-id");
+  #renderTemplates(data,componentTemplate) {
 
-    let DOMParser = new DOMParser();
+    const templates = componentTemplate.content.querySelectorAll("[data-template-id]");
+
+    let domParser = new DOMParser();
 
     for(let i = 0; i < templates.length;i++){
-      const templateName = templates[i].tagName;
-      const templateFunc = BaseDynamicComponent.templates[templateItem]; 
+      const templateName = templates[i].getAttribute("data-template-name").toUpperCase();
+      const templateFunc = BaseDynamicComponent.templates[templateName]; 
       const templateId = templates[i].getAttribute("data-template-id");
 
       if(!templateFunc){
         console.error(`Template ${templateItem} is not defined`);
       }
 
-      const state = data[templates[i].getAttribute("data-array"); 
+      const state = data[templates[i].getAttribute("data-array")] || []; 
+      
       const attrs = templates[i].attributes; 
       let props = {};
       
-      /*for(let j=0; j<attrs.length;j++){
-
-        if(attrs[j].name === "data-array"){
-          props["data"] = data[state];
-        } else {
-          props[attrs[j].name] = data[attrs[j].name];
-        }
-      }*/
-
       const nodes = [];
-      
       for(let num=0;num<state.length;num++){
         
-        const id = itemState[templateId];
-        const itemState = props["data"][num];
+        const id = state[num][templateId];
+        const itemState = state[num];
         
         const rowProps = {};
         for(let j=0;j<attrs.length;j++){
           if(attrs[j].name === "data-array"){
-            rowProps["data"] = data[state][num]
+            rowProps["data"] = itemState;
           }else {
               if(attrs[j].value.startsWith("data")){
-                rowProps[attrs[j].name]= data[attrs[j].value.split('.')[1]);
+                const itemKey = attrs[j].value.split('.')[1];
+                rowProps[attrs[j].name]= data[itemKey];
               }
           }
         }
         
-        const rowProps = {...props, {data:itemState}}
-
         let equalState = true;
-        const prevProps = prevState[id];
+        const prevProps = BaseDynamicComponent.prevState[id] || {};
         Object.keys(rowProps).forEach(propName=>{
           
           const propType = typeof rowProps[propName];
@@ -318,33 +309,33 @@ class BaseDynamicComponent extends HTMLElement {
           }
           if(propType === "object"){
             equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
-          } else {
-            console.error(`Invalid prop: ${propName}`);
-          }
+          } 
         });
 
         // Reuse old node if state has not changed.
         if(equalState) {
-          nodes.push(templateCache[templateName][id]]);
+          nodes.push(BaseDynamicComponent.templateCache[templateName][id]);
         }
         else {
-          const newItem = domParser.parseDOM(templateFunc(rowProps)); 
+          const template = document.createElement('template');
+          const templateData = templateFunc(rowProps); 
+
+          template.innerHTML = templateData;
+          const newItem = template.content.childNodes[0];
+          
           nodes.push(newItem);
-          templateCache[templateName][id]] = newItem;
-          prevState[id] = rowProps;
+          BaseDynamicComponent.templateCache[templateName][id] = newItem;
+          BaseDynamicComponent.prevState[id] = rowProps;
         }
       }
-      
-      templates[i].replaceWith(nodes);
-
-
-      /**
-       * TODO: Handle caching.
-       **/
+     
+      templates[i].replaceWith(...nodes);
     }
   }
   
   #generateAndSaveHTML(data) {
+    const template = document.createElement("template");
+
     if(this.#loadingStarted > 0){
       const current = Date.now();
       const loadTime = current - this.#loadingStarted;
@@ -359,19 +350,20 @@ class BaseDynamicComponent extends HTMLElement {
         const self = this;
         if(remainingTime > 0){
           setTimeout(()=>{
-            self.innerHTML = this.render(data);
+            template.innerHTML = this.render(data);
           },remainingTime);
         } else {
-          this.innerHTML = this.render(data);
+          template.innerHTML = this.render(data);
         }
       } else {
-        this.innerHTML = this.render(data);
+        template.innerHTML = this.render(data);
       }
     }
     else {
-      this.innerHTML = this.render(data);
+      template.innerHTML = this.render(data);
     }
-    this.#renderTemplates(data);
+    this.#renderTemplates(data,template);
+    this.innerHTML = template.innerHTML;
   }
 }
 

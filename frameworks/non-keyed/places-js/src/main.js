@@ -105,10 +105,9 @@ const setData = function() {
 
 const store = new Store(new CustomLoadAction(setData));
 
-TableItem = ({data,selected}) => {
+const TableItem = ({data,selected}) => {
  
-  return `
-    <tr id=${data.id}" class=${selected==data.id ? 'danger': ''}>
+  return`<tr id=${data.id} class="${selected==data.id ? 'danger':''}">
       <td class="col-md-1" >${data.id}</td>
         <td class="col-md-4">
           <a data-action="select" data-id=${data.id}>${data.label}</a>
@@ -124,8 +123,7 @@ TableItem = ({data,selected}) => {
           </a>
         </td>
        <td class="col-md-6"></td>
-    </tr>
-  `;
+    </tr>`;
 }
 BaseDynamicComponent.defineTemplate(TableItem,"TableItem");
 
@@ -176,7 +174,6 @@ export class MainElement extends BaseDynamicComponent {
 
   
   render(data){
-    const rows = data.data;
     const html = `
         <div class="container">
             <div class="jumbotron">
@@ -210,12 +207,13 @@ export class MainElement extends BaseDynamicComponent {
             </div>
             <table class="table table-hover table-striped test-data" >
                 <tbody>
-                  <TableItem
-                    data-array=rows
+                  <tr
+                    data-array=data
                     data-template-id=id
+                    data-template-name=TableItem
                     selected=data.selected
                   >
-                  </TableItem>
+                  </tr>
                </tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
