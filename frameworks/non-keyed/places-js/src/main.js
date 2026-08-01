@@ -93,7 +93,6 @@ class Store extends DataStore {
         });
       }
     }
-
 }
 
 const setData = function() {
@@ -105,6 +104,31 @@ const setData = function() {
 }
 
 const store = new Store(new CustomLoadAction(setData));
+
+TableItem = ({data,selected}) => {
+ 
+  return `
+    <tr id=${data.id}" class=${selected==data.id ? 'danger': ''}>
+      <td class="col-md-1" >${data.id}</td>
+        <td class="col-md-4">
+          <a data-action="select" data-id=${data.id}>${data.label}</a>
+        </td>
+        <td class="col-md-1">
+          <a>
+            <span 
+              class="glyphicon glyphicon-remove" 
+              aria-hidden="true"
+              data-action="remove"
+              data-id=${data.id}>
+            </span>
+          </a>
+        </td>
+       <td class="col-md-6"></td>
+    </tr>
+  `;
+}
+BaseDynamicComponent.defineTemplate(TableItem,"TableItem");
+
 
 export class MainElement extends BaseDynamicComponent {
   constructor(){
@@ -146,11 +170,9 @@ export class MainElement extends BaseDynamicComponent {
             else if (e.target.dataset.action === 'select') {
                 this.select(e.target.dataset.id);
             } 
-
     });
   }
 
- 
   
   render(data){
     const rows = data.data;
@@ -186,27 +208,22 @@ export class MainElement extends BaseDynamicComponent {
                 </div>
             </div>
             <table class="table table-hover table-striped test-data" >
-                <tbody>${rows.map(item => `
-                <tr id=${item.id} class=${data.selected == item.id ? 'danger' : ''}>
-                    <td class="col-md-1">${item.id}</td>
-                    <td class="col-md-4">
-                    <a data-action="select" data-id=${item.id}>${item.label}</a>
-                    </td>
-                    <td class="col-md-1">
-                    <a>
-                        <span class="glyphicon glyphicon-remove" aria-hidden="true"
-                            data-action="remove" data-id=${item.id}></span>
-                    </a>
-                    </td>
-                    <td class="col-md-6"></td>
-                </tr>`).join("")}
-                </tbody>
+                <tbody>
+                  <TableItem
+                    data-array=rows
+                    data-template-id=id
+                    selected=data.selected
+                  >
+                  </TableItem>
+               </tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
         </div>`;
         return html;
     }
 
+/*
+                   */
     add() {
         store.add();
     }
