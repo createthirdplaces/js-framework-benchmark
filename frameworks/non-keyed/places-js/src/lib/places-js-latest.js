@@ -144,6 +144,15 @@ class BaseDynamicComponent extends HTMLElement {
 	//Stores state for the component.
   componentStore = {};
 
+  static templates = {};
+  static templateCache = {};
+  static prevStateMap = {}; 
+
+  static defineTemplate(templateFunc, templateName){
+    templates[templateName.toUpperCase()] = templateFunc;
+    templateCache[templateName.toUpperCase()] = {};
+  }
+
 	/**
 	 * @param dataStoreSubscriptions - An array of data stores the component should
 	 * subscribe to.
@@ -206,7 +215,7 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-  	/**
+  /**
 	 * Update component with state data
 	 **/
   updateData(storeUpdates) {
@@ -252,6 +261,76 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
+  #renderTemplates(data) {
+    const templates = this.getRootNode().querySelectorAll("data-template-id");
+
+    let DOMParser = new DOMParser();
+
+    for(let i = 0; i < templates.length;i++){
+      const templateName = templates[i].tagName;
+      const templateFunc = BaseDynamicComponent.templates[templateItem]; 
+      const templateId = templates[i].getAttribute("data-template-id");
+
+      if(!templateFunc){
+        console.error(`Template ${templateItem} is not defined`);
+      }
+
+      const state = data[templates[i].getAttribute("data-array"); 
+      const attrs = templates[i].attributes; 
+      let props = {};
+      for(let j=0; j<attrs.length;j++){
+
+        if(attrs[j].name === "data-array"){
+          props["data"] = data[state];
+        } else {
+          props[attrs[j].name] = data[attrs[j].name];
+        }
+      }
+
+      const nodes = [];
+      
+      for(let num=0;num<state.length;num++){
+        
+        const id = itemState[templateId];
+        const itemState = props["data"][num];
+        const rowProps = {...props, {data:itemState}}
+
+        let equalState = true;
+        const prevProps = prevState[id];
+        Object.keys(rowProps).forEach(propName=>{
+          
+          const propType = typeof rowProps[propName];
+          if(propType === "number" || propType === "string"){
+            equalState = equalState && rowProps[propName] === prevProps[propName];
+          }
+          if(propType === "object"){
+            equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
+          } else {
+            console.error(`Invalid prop: ${propName}`);
+          }
+        });
+
+        // Reuse old node if state has not changed.
+        if(equalState) {
+          nodes.push(templateCache[templateName][id]]);
+        }
+        else {
+          const newItem = domParser.parseDOM(templateFunc(rowProps)); 
+          nodes.push(newItem);
+          templateCache[templateName][id]] = newItem;
+          prevState[id] = rowProps;
+        }
+      }
+      
+      templates[i].replaceWith(nodes);
+
+
+      /**
+       * TODO: Handle caching.
+       **/
+    }
+  }
+  
   #generateAndSaveHTML(data) {
     if(this.#loadingStarted > 0){
       const current = Date.now();
@@ -279,9 +358,8 @@ class BaseDynamicComponent extends HTMLElement {
     else {
       this.innerHTML = this.render(data);
     }
+    this.#renderTemplates(data);
   }
-
-
 }
 
 class BaseTemplateComponent extends HTMLElement {
