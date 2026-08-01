@@ -261,10 +261,10 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-  #renderTemplates(data) {
+  #renderTemplates(data,componentTemplate) {
 
-    //const templates = componentTemplate.content.querySelectorAll("[data-template-id]");
-    const templates = this.getRootNode().querySelectorAll("[data-template-id]");
+    const templates = componentTemplate.content.querySelectorAll("[data-template-id]");
+    //const templates = this.getRootNode().querySelectorAll("[data-template-id]");
 
     let domParser = new DOMParser();
 
@@ -333,11 +333,9 @@ class BaseDynamicComponent extends HTMLElement {
 
         // Reuse old node if state has not changed.
         if(equalState) {
-          console.log("Cache");
           nodes.push(BaseDynamicComponent.templateCache[templateName][id]);
         }
         else {
-          console.log("No cache");
           const template = document.createElement('template');
           const templateData = templateFunc(rowProps); 
 
@@ -356,6 +354,8 @@ class BaseDynamicComponent extends HTMLElement {
   
   #generateAndSaveHTML(data) {
 
+    let template = document.createElement("template");
+
     if(this.#loadingStarted > 0){
       const current = Date.now();
       const loadTime = current - this.#loadingStarted;
@@ -370,20 +370,20 @@ class BaseDynamicComponent extends HTMLElement {
         const self = this;
         if(remainingTime > 0){
           setTimeout(()=>{
-            this.innerHTML = this.render(data);
+            template.innerHTML = this.render(data);
           },remainingTime);
         } else {
-          this.innerHTML = this.render(data);
+          template.innerHTML = this.render(data);
         }
       } else {
-        this.innerHTML = this.render(data);
+        template.innerHTML = this.render(data);
       }
     }
     else {
-      this.innerHTML = this.render(data);
+      template.innerHTML = this.render(data);
     }
-    this.#renderTemplates(data);
-    //this.innerHTML = template.innerHTML;
+    this.#renderTemplates(data,template);
+    this.innerHTML = template.innerHTML;
   }
 }
 
