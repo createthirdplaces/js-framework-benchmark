@@ -170,6 +170,7 @@ export class MainElement extends BaseDynamicComponent {
             else if (e.target.dataset.action === 'select') {
                 this.select(e.target.dataset.id);
             } 
+
     });
   }
 
@@ -222,8 +223,6 @@ export class MainElement extends BaseDynamicComponent {
         return html;
     }
 
-/*
-                   */
     add() {
         store.add();
     }

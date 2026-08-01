@@ -278,14 +278,15 @@ class BaseDynamicComponent extends HTMLElement {
       const state = data[templates[i].getAttribute("data-array"); 
       const attrs = templates[i].attributes; 
       let props = {};
-      for(let j=0; j<attrs.length;j++){
+      
+      /*for(let j=0; j<attrs.length;j++){
 
         if(attrs[j].name === "data-array"){
           props["data"] = data[state];
         } else {
           props[attrs[j].name] = data[attrs[j].name];
         }
-      }
+      }*/
 
       const nodes = [];
       
@@ -293,6 +294,18 @@ class BaseDynamicComponent extends HTMLElement {
         
         const id = itemState[templateId];
         const itemState = props["data"][num];
+        
+        const rowProps = {};
+        for(let j=0;j<attrs.length;j++){
+          if(attrs[j].name === "data-array"){
+            rowProps["data"] = data[state][num]
+          }else {
+              if(attrs[j].value.startsWith("data")){
+                rowProps[attrs[j].name]= data[attrs[j].value.split('.')[1]);
+              }
+          }
+        }
+        
         const rowProps = {...props, {data:itemState}}
 
         let equalState = true;
