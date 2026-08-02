@@ -107,9 +107,12 @@ const store = new Store(new CustomLoadAction(setData));
 
 const TableItem = () => {
 
-  TableItem.selected = (params)=>{params.selected===params.id? 'danger':''};
-  return`<tr {{id=id}} {{class=selected}}>
-      <td class="col-md-1" >{{id}}</td>
+  TableItem.selected = (params)=>{
+    return parseInt(params.selected)===parseInt(params.id)? 'danger':''
+  };
+  return`
+    <tr {{id=id}} {{className=selected}}>
+      <td class="col-md-1" {{textContent=id}}>Test</td>
         <td class="col-md-4">
           <a data-action="select" 
             {{data-id=id}}
