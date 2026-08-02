@@ -154,45 +154,64 @@ class BaseDynamicComponent extends HTMLElement {
     let template = document.createElement("template");
     let templateStr = templateFunc();
 
-    BaseDynamicComponent.templateSignals(templateName) = [];
-
     let signals = [];
 
-    const split = templateStr.split("{{");
-    for(let i=0;i<split.length;i++){
-      const signal = split[i].split("}}");
-      
-      const data = signal[0].split("=",1);;
+    //TOOD: Optimize peformance. 
+    const start = Date.now();
+    let i = 0;
+    while(true){
+      const stateVarPos = templateStr.indexOf("{{");
+      if(stateVarPos === -1){
+        break;
+      }
+     
+      const endPos = templateStr.indexOf("}}");
+      const signalStr = templateStr.substring(stateVarPos+2, endPos);
+      const data = signalStr.split("=");
       const attr = data[0];
       const fieldName = data[1];
 
       let newStr = "";
-      newStr+=`data-signal-id=${i}`;
+      newStr+=`data-signal-id-${i}`;
 
-      signals[i] = (data,elementRoot)=>{
+
+      const signal = (data,elementRoot,signalId)=>{
 
         let updated = data[fieldName];
 
-        if((typeof template[fieldName]) == 'function'){
-          updated = template[fieldName](data);
+        if((typeof templateFunc[fieldName]) == 'function'){
+          updated = templateFunc[fieldName](data);
         }
-
-        elementRoot.querySelector(`[data-signal-id=${i}]`)
-          .setAttribute(attr,updated);
+      
+        const element = elementRoot.content.querySelector(`[data-signal-id-${signalId}]`);
+       
+        if(attr==="textContent"){
+          element.textContent = updated;
+        } else if (attr === "className"){
+          element.className = updated; 
+        } else {
+          element.setAttribute(attr,`${updated}`);
+        }
+       
       }
-      split[i] = newStr + signal[1]
+
+      templateStr = templateStr.substring(0,stateVarPos) +
+        newStr + templateStr.substring(endPos+2);
+      signals.push(signal);
+      i++;
     }
 
-    template.innerHTML = split.join();
+    BaseDynamicComponent.templateSignals[templateName.toUpperCase()] = signals;
 
-    BaseDynamicComponent.templates[templateName.toUpperCase()] = template.content;
+    template.innerHTML = templateStr;
+
+    BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
     BaseDynamicComponent.templateCache[templateName.toUpperCase()] = {};
   }
 
 	/**
 	 * @param dataStoreSubscriptions - An array of data stores the component should
 	 * subscribe to.
-	 * @param loadingIndicatorConfig - Configuration for a custom loading
 	 * indicator.
 	 **/
   constructor(dataStoreSubscriptions = [], loadingIndicatorConfig) {
@@ -216,8 +235,7 @@ class BaseDynamicComponent extends HTMLElement {
 
     this.updateFromSubscribedStores();
   }
-
-  
+ 
 	/**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
 	 * replaces UI components and disables any user events.
@@ -299,32 +317,28 @@ class BaseDynamicComponent extends HTMLElement {
 
   #renderTemplates(data,componentTemplate) {
 
-    const templates = componentTemplate.content.querySelectorAll("[data-template-id]");
-    //const templates = this.getRootNode().querySelectorAll("[data-template-id]");
-
+    const templates = componentTemplate.content.querySelectorAll("[data-template-name]");
     let domParser = new DOMParser();
 
     for(let i = 0; i < templates.length;i++){
 
       const templateName = templates[i].getAttribute("data-template-name").toUpperCase();  
       const templateNode = BaseDynamicComponent.templates[templateName]; 
-      const templateId = templates[i].getAttribute("data-template-id");
-
       const state = data[templates[i].getAttribute("data-array")] || []; 
       
       const attrs = templates[i].attributes; 
       let props = {};
       
       const nodes = [];
+      
       for(let num=0;num<state.length;num++){
-        
-        const id = state[num][templateId];
-        const itemState = state[num];
-        
-        const rowProps = itemState;
+      
+        const id = state[num].id;
+        const itemState = state[num];        
+        const rowProps = {...itemState}
+
         for(let j=0;j<attrs.length;j++){
           if(attrs[j].name !== "data-array"){
-          {
             if(attrs[j].value.startsWith("data")){
               const itemKey = attrs[j].value.split('.')[1];
               rowProps[attrs[j].name]= data[itemKey];
@@ -344,11 +358,8 @@ class BaseDynamicComponent extends HTMLElement {
           } 
         });
 
-
-        /*
-         * TODO: Enable caching and make sure unecessary re-rendering is not
-         * done.
-         **/
+        // * TODO: Enable caching and make sure unecessary re-rendering is not
+        // * done.
         if(false) {
           console.log("Using item from cache");
           nodes.push(BaseDynamicComponent.templateCache[templateName][id].cloneNode(true));
@@ -357,14 +368,13 @@ class BaseDynamicComponent extends HTMLElement {
           const updatedNode = templateNode.cloneNode(true);
           const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
           for(let sNum=0;sNum<signalsToRun.length;sNum++){
-            signalsToRun[i](rowProps,updatedNode.getRootNode());
+            signalsToRun[sNum](rowProps,updatedNode,sNum);
           }  
-          nodes.push(updatedNode);
-          BaseDynamicComponent.templateCache[templateName][id] = newItem;
+          nodes.push(updatedNode.content);
+          BaseDynamicComponent.templateCache[templateName][id] = updatedNode;
           BaseDynamicComponent.prevState[id] = rowProps;
         }
       }
-     
       templates[i].replaceWith(...nodes);
     }
   }
