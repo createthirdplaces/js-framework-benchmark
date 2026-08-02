@@ -145,11 +145,47 @@ class BaseDynamicComponent extends HTMLElement {
   componentStore = {};
 
   static templates = {};
+  static templateSignals = {};
   static templateCache = {};
   static prevState = {}; 
 
   static defineTemplate(templateFunc, templateName){
-    BaseDynamicComponent.templates[templateName.toUpperCase()] = templateFunc;
+
+    let template = document.createElement("template");
+    let templateStr = templateFunc();
+
+    BaseDynamicComponent.templateSignals(templateName) = [];
+
+    let signals = [];
+
+    const split = templateStr.split("{{");
+    for(let i=0;i<split.length;i++){
+      const signal = split[i].split("}}");
+      
+      const data = signal[0].split("=",1);;
+      const attr = data[0];
+      const fieldName = data[1];
+
+      let newStr = "";
+      newStr+=`data-signal-id=${i}`;
+
+      signals[i] = (data,elementRoot)=>{
+
+        let updated = data[fieldName];
+
+        if((typeof template[fieldName]) == 'function'){
+          updated = template[fieldName](data);
+        }
+
+        elementRoot.querySelector(`[data-signal-id=${i}]`)
+          .setAttribute(attr,updated);
+      }
+      split[i] = newStr + signal[1]
+    }
+
+    template.innerHTML = split.join();
+
+    BaseDynamicComponent.templates[templateName.toUpperCase()] = template.content;
     BaseDynamicComponent.templateCache[templateName.toUpperCase()] = {};
   }
 
@@ -269,13 +305,10 @@ class BaseDynamicComponent extends HTMLElement {
     let domParser = new DOMParser();
 
     for(let i = 0; i < templates.length;i++){
-      const templateName = templates[i].getAttribute("data-template-name").toUpperCase();
-      const templateFunc = BaseDynamicComponent.templates[templateName]; 
-      const templateId = templates[i].getAttribute("data-template-id");
 
-      if(!templateFunc){
-        console.error(`Template ${templateItem} is not defined`);
-      }
+      const templateName = templates[i].getAttribute("data-template-name").toUpperCase();  
+      const templateNode = BaseDynamicComponent.templates[templateName]; 
+      const templateId = templates[i].getAttribute("data-template-id");
 
       const state = data[templates[i].getAttribute("data-array")] || []; 
       
@@ -288,22 +321,20 @@ class BaseDynamicComponent extends HTMLElement {
         const id = state[num][templateId];
         const itemState = state[num];
         
-        const rowProps = {};
+        const rowProps = itemState;
         for(let j=0;j<attrs.length;j++){
-          if(attrs[j].name === "data-array"){
-            rowProps["data"] = itemState;
-          }else {
-              if(attrs[j].value.startsWith("data")){
-                const itemKey = attrs[j].value.split('.')[1];
-                rowProps[attrs[j].name]= data[itemKey];
-              }
+          if(attrs[j].name !== "data-array"){
+          {
+            if(attrs[j].value.startsWith("data")){
+              const itemKey = attrs[j].value.split('.')[1];
+              rowProps[attrs[j].name]= data[itemKey];
+            }
           }
         }
         
         let equalState = true;
         const prevProps = BaseDynamicComponent.prevState[id] || {};
         Object.keys(rowProps).forEach(propName=>{
-          
           const propType = typeof rowProps[propName];
           if(propType === "number" || propType === "string"){
             equalState = equalState && rowProps[propName] === prevProps[propName];
@@ -313,36 +344,22 @@ class BaseDynamicComponent extends HTMLElement {
           } 
         });
 
-        /*
-         * Optimization idea.
-         *
-         * Loop through the new state array. If the current node at the same
-         * index has the same 
-         * state, keep it in the DOM. If the id is same with different state,
-         * update the node. If the id in the new state is different, see if the 
-         * state exists in the old state and can be moved. Otherwise, create a
-         * new node.
-         *  -If a new node is created, only increment the new node counter.
-         *
-         * - Before the loop, deleted nodes should be removed
-         *
-         * It is essentially this problem. Given 1 array, how can it
-         * be transformed into another array with the fewest number of swaps,
-         * inserts, and deletions.
-         */
 
-        // Reuse old node if state has not changed.
-        if(equalState) {
-          nodes.push(BaseDynamicComponent.templateCache[templateName][id]);
+        /*
+         * TODO: Enable caching and make sure unecessary re-rendering is not
+         * done.
+         **/
+        if(false) {
+          console.log("Using item from cache");
+          nodes.push(BaseDynamicComponent.templateCache[templateName][id].cloneNode(true));
         }
         else {
-          const template = document.createElement('template');
-          const templateData = templateFunc(rowProps); 
-
-          template.innerHTML = templateData;
-          const newItem = template.content.childNodes[0];
-          
-          nodes.push(newItem);
+          const updatedNode = templateNode.cloneNode(true);
+          const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+          for(let sNum=0;sNum<signalsToRun.length;sNum++){
+            signalsToRun[i](rowProps,updatedNode.getRootNode());
+          }  
+          nodes.push(updatedNode);
           BaseDynamicComponent.templateCache[templateName][id] = newItem;
           BaseDynamicComponent.prevState[id] = rowProps;
         }
@@ -354,6 +371,7 @@ class BaseDynamicComponent extends HTMLElement {
   
   #generateAndSaveHTML(data) {
 
+    let start = Date.now();
     let template = document.createElement("template");
 
     if(this.#loadingStarted > 0){
@@ -382,7 +400,10 @@ class BaseDynamicComponent extends HTMLElement {
     else {
       template.innerHTML = this.render(data);
     }
+
+    this.innerHTML = "";
     this.#renderTemplates(data,template);
+    console.log(Date.now()-start);
     this.innerHTML = template.innerHTML;
   }
 }

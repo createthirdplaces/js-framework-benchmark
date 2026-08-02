@@ -105,12 +105,17 @@ const setData = function() {
 
 const store = new Store(new CustomLoadAction(setData));
 
-const TableItem = ({data,selected}) => {
- 
-  return`<tr id=${data.id} class="${selected==data.id ? 'danger':''}">
-      <td class="col-md-1" >${data.id}</td>
+const TableItem = () => {
+
+  TableItem.selected = (params)=>{params.selected===params.id? 'danger':''};
+  return`<tr {{id=id}} {{class=selected}}>
+      <td class="col-md-1" >{{id}}</td>
         <td class="col-md-4">
-          <a data-action="select" data-id=${data.id}>${data.label}</a>
+          <a data-action="select" 
+            {{data-id=id}}
+            {{textContent=label}}
+            >
+            </a>
         </td>
         <td class="col-md-1">
           <a>
@@ -118,7 +123,8 @@ const TableItem = ({data,selected}) => {
               class="glyphicon glyphicon-remove" 
               aria-hidden="true"
               data-action="remove"
-              data-id=${data.id}>
+              {{data-id=id}}
+            >
             </span>
           </a>
         </td>
@@ -209,7 +215,6 @@ export class MainElement extends BaseDynamicComponent {
                 <tbody>
                   <tr
                     data-array=data
-                    data-template-id=id
                     data-template-name=TableItem
                     selected=data.selected
                   >
