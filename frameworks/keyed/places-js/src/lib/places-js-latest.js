@@ -186,18 +186,13 @@ class BaseDynamicComponent extends HTMLElement {
       
       const signal = (signalData,elementRoot,signalId)=>{
 
-        let updated = signalData[fieldName];
-      
-        /*
-        let computed = null;
-
-          computed = templateFunc[fieldName];
-          updated = computed(signalData);
-          //console.log("Updated:"+updated);
-        }*/
-      
-        const element = elementRoot.content.querySelector(`[data-signal-id-${signalId}]`);
-       
+        let updated = signalData[fieldName]; 
+        let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
+     
+        //Set attribute on root node as the default case.
+        if(!element){
+          element=elementRoot;
+        }
         if(attr==="textContent"){
           element.textContent = updated;
         } else if (attr === "className"){
@@ -388,14 +383,19 @@ class BaseDynamicComponent extends HTMLElement {
             }
           }
         }
+        
+        let equalState = true;
+       
+        const prevProps = BaseDynamicComponent.prevState[templateName][""+id] || {};
+        
         //Calculate computed values.
         const computed = BaseDynamicComponent.computedProps[templateName];
         Object.keys(computed).forEach((computedKey)=>{
           rowProps[computedKey] = computed[computedKey](rowProps);
+          equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
         });
         
-        let equalState = true;
-        const prevProps = BaseDynamicComponent.prevState[templateName][""+id] || {};
+        
         Object.keys(itemState).forEach(propName=>{
           const propType = typeof rowProps[propName];
           if(propType === "number" || propType === "string"){
@@ -407,21 +407,30 @@ class BaseDynamicComponent extends HTMLElement {
         });
        
           let updatedNode;
-          if(false){
-            console.log(equalState);
+          if(!replace){
+            if(!equalState){
+              const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+              for(let sNum=0;sNum<signalsToRun.length;sNum++){ 
+                signalsToRun[sNum](
+                  rowProps,
+                  this.getRootNode().getElementById(""+id), 
+                  sNum);
+              }
+              BaseDynamicComponent.prevState[templateName][id] = rowProps;
+            } 
           }
           else {
             updatedNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
             for(let sNum=0;sNum<signalsToRun.length;sNum++){
-              signalsToRun[sNum](rowProps,updatedNode,sNum);
+              signalsToRun[sNum](rowProps,updatedNode.content,sNum);
             } 
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
         }
       }
 
-      if(false){
+      if(replace){
         templates[i].replaceChildren(fragment);
       }
     }
