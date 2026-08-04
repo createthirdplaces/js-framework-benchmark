@@ -149,6 +149,7 @@ class BaseDynamicComponent extends HTMLElement {
   static templates = {};
   static templateSignals = {};
   static prevState = {}; 
+  static prevOrdering = {};
 
   static defineTemplate(templateFunc, templateName){
 
@@ -215,6 +216,7 @@ class BaseDynamicComponent extends HTMLElement {
 
     BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
     BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
+    BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]={};
   }
 
 	/**
@@ -340,26 +342,27 @@ class BaseDynamicComponent extends HTMLElement {
       const nodes = []; 
       const fragment = document.createDocumentFragment();
 
-      let replace = true;
-      
+      let replace = true; 
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
       const prevIds = new Set();
       const newIds = new Set();
       let diff = new Set();
 
-      if(prevStateLen === state.length){
-        for(let num=1;num<state.length+1;num++){
-          prevIds.add(BaseDynamicComponent.prevState[templateName][""+num].id);
-          newIds.add(state[num-1].id);
-        }
-
-        diff = prevIds.difference(newIds);
-        if(diff.size === 0){
-          replace = false;
-        }
+      const updatedOrdering = [];
+      for(let num=0;num<state.length;num++){
+        updatedOrdering.push(state[num].id);
       }
-
+      
+      if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName]){
+        let hasDiff = false;  
+        for(let num=0;num<updatedOrdering.length;num++){
+          if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName]){
+            hasDiff = true; 
+          }
+        } 
+        replace = hasDiff;
+      }
         /*
          * TODO
          *  -Handle case where nodes are added
@@ -368,7 +371,7 @@ class BaseDynamicComponent extends HTMLElement {
          *  starting point, just receate the entire 
          *  tree if there are multiple types of operations
          */
-      
+     
       for(let num=0;num<state.length;num++){
       
         const id = state[num].id;
@@ -394,8 +397,7 @@ class BaseDynamicComponent extends HTMLElement {
           rowProps[computedKey] = computed[computedKey](rowProps);
           equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
         });
-        
-        
+                
         Object.keys(itemState).forEach(propName=>{
           const propType = typeof rowProps[propName];
           if(propType === "number" || propType === "string"){
@@ -427,10 +429,12 @@ class BaseDynamicComponent extends HTMLElement {
             } 
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
+            BaseDynamicComponent.prevOrdering[templateName].push(id);
         }
       }
 
       if(replace){
+        BaseDynamicComponent.prevOrdering[templateName] = [];
         templates[i].replaceChildren(fragment);
       }
     }
