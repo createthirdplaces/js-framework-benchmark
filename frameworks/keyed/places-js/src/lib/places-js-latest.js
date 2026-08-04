@@ -143,6 +143,7 @@ class BaseDynamicComponent extends HTMLElement {
 
 	//Stores state for the component.
   componentStore = {};
+  #templateLoaded = false;
 
   static templates = {};
   static templateSignals = {};
@@ -175,12 +176,13 @@ class BaseDynamicComponent extends HTMLElement {
       newStr+=`data-signal-id-${i}`;
 
 
-      const signal = (data,elementRoot,signalId)=>{
+      const signal = (signalData,elementRoot,signalId)=>{
 
-        let updated = data[fieldName];
+        let updated = signalData[fieldName];
 
         if((typeof templateFunc[fieldName]) == 'function'){
-          updated = templateFunc[fieldName](data);
+          updated = templateFunc[fieldName](signalData);
+          //console.log("Updated:"+updated);
         }
       
         const element = elementRoot.content.querySelector(`[data-signal-id-${signalId}]`);
@@ -315,9 +317,9 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-  #renderTemplates(data,componentTemplate) {
-
-    const templates = componentTemplate.content.querySelectorAll("[data-template-name]");
+  #renderTemplates(data,content) {
+ 
+    const templates= content.querySelectorAll("[data-template-name]");
     let domParser = new DOMParser();
 
     for(let i = 0; i < templates.length;i++){
@@ -330,7 +332,18 @@ class BaseDynamicComponent extends HTMLElement {
       let props = {};
       
       const nodes = [];
-      
+     
+      //Save template data in parent element if array data
+      //is empty
+      if(state.length === 0){ 
+        for(let j=0;j<attrs.length;j++){
+          /*templateNode.parentNode.setAttribute(
+            attrs[j].name, 
+            attrs[j].value);*/
+        }
+        //templateNode.innerHTML = `{{test}}`;
+      }
+    
       for(let num=0;num<state.length;num++){
       
         const id = state[num].id;
@@ -375,46 +388,56 @@ class BaseDynamicComponent extends HTMLElement {
           BaseDynamicComponent.prevState[id] = rowProps;
         }
       }
-      templates[i].replaceWith(...nodes);
+      templates[i].replaceChildren(...nodes);
+    }
+    
+     if(templates.length >= 0){
+      this.#templateLoaded = true;
     }
   }
   
   #generateAndSaveHTML(data) {
 
     let start = Date.now();
-    let template = document.createElement("template");
 
-    if(this.#loadingStarted > 0){
-      const current = Date.now();
-      const loadTime = current - this.#loadingStarted;
+    //Don't re-render static HTML if templates are being used.
+    if(!this.#templateLoaded){
+      const template = document.createElement("template");
+      if(this.#loadingStarted > 0){
+        const current = Date.now();
+        const loadTime = current - this.#loadingStarted;
 
-      this.#loadingStarted = 0;
-      
-			//Handle case where loading indicator is configured to stay visible for a
-			//minimum amount of time.
-			if(this.#loadingIndicatorConfig?.minTimeMs){
-        const remainingTime = this.#loadingIndicatorConfig.minTimeMs - loadTime;
+        this.#loadingStarted = 0;
+        
+        //Handle case where loading indicator is configured to stay visible for a
+        //minimum amount of time.
+        if(this.#loadingIndicatorConfig?.minTimeMs){
+          const remainingTime = this.#loadingIndicatorConfig.minTimeMs - loadTime;
 
-        const self = this;
-        if(remainingTime > 0){
-          setTimeout(()=>{
+          const self = this;
+          if(remainingTime > 0){
+            setTimeout(()=>{
+              template.innerHTML = this.render(data);
+            },remainingTime);
+          } else {
             template.innerHTML = this.render(data);
-          },remainingTime);
+          }
         } else {
           template.innerHTML = this.render(data);
         }
-      } else {
+      }
+      else {
         template.innerHTML = this.render(data);
       }
-    }
-    else {
-      template.innerHTML = this.render(data);
-    }
 
-    this.innerHTML = "";
-    this.#renderTemplates(data,template);
-    console.log(Date.now()-start);
-    this.innerHTML = template.innerHTML;
+      this.innerHTML = "";
+      this.#renderTemplates(data,template.content);
+      console.log(Date.now()-start);
+      this.innerHTML = template.innerHTML;
+    } else {
+      this.#renderTemplates(data,this);
+      console.log(Date.now()-start);
+    }
   }
 }
 
