@@ -216,7 +216,7 @@ class BaseDynamicComponent extends HTMLElement {
 
     BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
     BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
-    BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]={};
+    BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]=[];
   }
 
 	/**
@@ -353,11 +353,11 @@ class BaseDynamicComponent extends HTMLElement {
       for(let num=0;num<state.length;num++){
         updatedOrdering.push(state[num].id);
       }
-      
-      if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName]){
+     
+      if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
         let hasDiff = false;  
         for(let num=0;num<updatedOrdering.length;num++){
-          if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName]){
+          if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName][num]){
             hasDiff = true; 
           }
         } 
@@ -429,12 +429,11 @@ class BaseDynamicComponent extends HTMLElement {
             } 
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
-            BaseDynamicComponent.prevOrdering[templateName].push(id);
         }
       }
 
       if(replace){
-        BaseDynamicComponent.prevOrdering[templateName] = [];
+        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
         templates[i].replaceChildren(fragment);
       }
     }
