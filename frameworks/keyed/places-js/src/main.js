@@ -108,7 +108,8 @@ const store = new Store(new CustomLoadAction(setData));
 const TableItem = () => {
 
   TableItem.selected = (params)=>{
-    return parseInt(params.selected)===parseInt(params.id)? 'danger':''
+    const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
+    return result;
   };
   return`
     <tr {{id=id}} {{className=selected}}>
@@ -215,13 +216,11 @@ export class MainElement extends BaseDynamicComponent {
                 </div>
             </div>
             <table class="table table-hover table-striped test-data" >
-                <tbody>
-                  <tr
+                <tbody
                     data-array=data
                     data-template-name=TableItem
                     selected=data.selected
-                  >
-                  </tr>
+                >
                </tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
