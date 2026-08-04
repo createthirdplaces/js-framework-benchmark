@@ -145,9 +145,9 @@ class BaseDynamicComponent extends HTMLElement {
   componentStore = {};
   #templateLoaded = false;
 
+  static computedProps = {};
   static templates = {};
   static templateSignals = {};
-  static templateCache = {};
   static prevState = {}; 
 
   static defineTemplate(templateFunc, templateName){
@@ -157,6 +157,9 @@ class BaseDynamicComponent extends HTMLElement {
 
     let signals = [];
 
+
+    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
+    
     //TOOD: Optimize peformance. 
     const start = Date.now();
     let i = 0;
@@ -175,15 +178,23 @@ class BaseDynamicComponent extends HTMLElement {
       let newStr = "";
       newStr+=`data-signal-id-${i}`;
 
+      
+      if((typeof templateFunc[fieldName]) == 'function'){
+        BaseDynamicComponent.computedProps[templateName.toUpperCase()][fieldName] = templateFunc[fieldName];
 
+      }
+      
       const signal = (signalData,elementRoot,signalId)=>{
 
         let updated = signalData[fieldName];
+      
+        /*
+        let computed = null;
 
-        if((typeof templateFunc[fieldName]) == 'function'){
-          updated = templateFunc[fieldName](signalData);
+          computed = templateFunc[fieldName];
+          updated = computed(signalData);
           //console.log("Updated:"+updated);
-        }
+        }*/
       
         const element = elementRoot.content.querySelector(`[data-signal-id-${signalId}]`);
        
@@ -208,7 +219,7 @@ class BaseDynamicComponent extends HTMLElement {
     template.innerHTML = templateStr;
 
     BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
-    BaseDynamicComponent.templateCache[templateName.toUpperCase()] = {};
+    BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
   }
 
 	/**
@@ -331,19 +342,38 @@ class BaseDynamicComponent extends HTMLElement {
       const attrs = templates[i].attributes; 
       let props = {};
       
-      const nodes = [];
-     
-      //Save template data in parent element if array data
-      //is empty
-      if(state.length === 0){ 
-        for(let j=0;j<attrs.length;j++){
-          /*templateNode.parentNode.setAttribute(
-            attrs[j].name, 
-            attrs[j].value);*/
-        }
-        //templateNode.innerHTML = `{{test}}`;
-      }
+      const nodes = []; 
+      const fragment = document.createDocumentFragment();
+
+      let replace = true;
+      
+      const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
+      const prevIds = new Set();
+      const newIds = new Set();
+      let diff = new Set();
+
+      if(prevStateLen === state.length){
+        for(let num=1;num<state.length+1;num++){
+          prevIds.add(BaseDynamicComponent.prevState[templateName][""+num].id);
+          newIds.add(state[num-1].id);
+        }
+
+        diff = prevIds.difference(newIds);
+        if(diff.size === 0){
+          replace = false;
+        }
+      }
+
+        /*
+         * TODO
+         *  -Handle case where nodes are added
+         *  -Handle case where nodes are deleted.
+         *  -Handle case where nodes are moved. As a 
+         *  starting point, just receate the entire 
+         *  tree if there are multiple types of operations
+         */
+      
       for(let num=0;num<state.length;num++){
       
         const id = state[num].id;
@@ -358,10 +388,15 @@ class BaseDynamicComponent extends HTMLElement {
             }
           }
         }
+        //Calculate computed values.
+        const computed = BaseDynamicComponent.computedProps[templateName];
+        Object.keys(computed).forEach((computedKey)=>{
+          rowProps[computedKey] = computed[computedKey](rowProps);
+        });
         
         let equalState = true;
-        const prevProps = BaseDynamicComponent.prevState[id] || {};
-        Object.keys(rowProps).forEach(propName=>{
+        const prevProps = BaseDynamicComponent.prevState[templateName][""+id] || {};
+        Object.keys(itemState).forEach(propName=>{
           const propType = typeof rowProps[propName];
           if(propType === "number" || propType === "string"){
             equalState = equalState && rowProps[propName] === prevProps[propName];
@@ -370,25 +405,25 @@ class BaseDynamicComponent extends HTMLElement {
             equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
           } 
         });
-
-        // * TODO: Enable caching and make sure unecessary re-rendering is not
-        // * done.
-        if(false) {
-          console.log("Using item from cache");
-          nodes.push(BaseDynamicComponent.templateCache[templateName][id].cloneNode(true));
-        }
-        else {
-          const updatedNode = templateNode.cloneNode(true);
-          const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-          for(let sNum=0;sNum<signalsToRun.length;sNum++){
-            signalsToRun[sNum](rowProps,updatedNode,sNum);
-          }  
-          nodes.push(updatedNode.content);
-          BaseDynamicComponent.templateCache[templateName][id] = updatedNode;
-          BaseDynamicComponent.prevState[id] = rowProps;
+       
+          let updatedNode;
+          if(false){
+            console.log(equalState);
+          }
+          else {
+            updatedNode = templateNode.cloneNode(true);
+            const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+            for(let sNum=0;sNum<signalsToRun.length;sNum++){
+              signalsToRun[sNum](rowProps,updatedNode,sNum);
+            } 
+            fragment.appendChild(updatedNode.content);
+            BaseDynamicComponent.prevState[templateName][id] = rowProps;
         }
       }
-      templates[i].replaceChildren(...nodes);
+
+      if(false){
+        templates[i].replaceChildren(fragment);
+      }
     }
     
      if(templates.length >= 0){

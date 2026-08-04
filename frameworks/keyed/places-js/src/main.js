@@ -111,6 +111,7 @@ const TableItem = () => {
     const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
     return result;
   };
+  
   return`
     <tr {{id=id}} {{className=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
@@ -215,7 +216,7 @@ export class MainElement extends BaseDynamicComponent {
                     </div>
                 </div>
             </div>
-            <table class="table table-hover table-striped test-data" >
+            <table style="table-layout:fixed" class="table table-hover table-striped test-data" >
                 <tbody
                     data-array=data
                     data-template-name=TableItem
