@@ -345,15 +345,38 @@ class BaseDynamicComponent extends HTMLElement {
       let replace = true; 
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
-      const prevIds = new Set();
-      const newIds = new Set();
-      let diff = new Set();
-
       const updatedOrdering = [];
       for(let num=0;num<state.length;num++){
         updatedOrdering.push(state[num].id);
+      } 
+
+      const prevIds = new Set(BaseDynamicComponent.prevOrdering[templateName]);
+      const newIds = new Set(updatedOrdering);
+
+      let removed = prevIds.difference(newIds);
+      let added = newIds.difference(newIds);
+
+      if(added.size > 0){
+        //console.log("Adding"); 
       }
-     
+      
+      if(removed.size > 0) {
+        const self = this;
+        removed.forEach((id)=>{ 
+          const node = self.getRootNode().getElementById(""+id);
+          node.parentNode.removeChild(node);
+
+          const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
+          BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
+        });
+        replace = false;
+      }
+
+      /*
+       * TODO: Handle case where nodes have moved. If length is the same
+       * and the ordering is differennt after processing
+       * adding and removing nodes, nodes have been moved.
+       */
       if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
         let hasDiff = false;  
         for(let num=0;num<updatedOrdering.length;num++){
@@ -362,6 +385,8 @@ class BaseDynamicComponent extends HTMLElement {
           }
         } 
         replace = hasDiff;
+      }else {
+        replace = true;
       }
         /*
          * TODO
@@ -397,12 +422,12 @@ class BaseDynamicComponent extends HTMLElement {
           rowProps[computedKey] = computed[computedKey](rowProps);
           equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
         });
-                
+               
         Object.keys(itemState).forEach(propName=>{
-          const propType = typeof rowProps[propName];
-          if(propType === "number" || propType === "string"){
+          const propType = typeof rowProps[propName]; 
+          if(propType === 'number' || propType === 'string'){
             equalState = equalState && rowProps[propName] === prevProps[propName];
-          }
+          };
           if(propType === "object"){
             equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
           } 
@@ -445,14 +470,14 @@ class BaseDynamicComponent extends HTMLElement {
   
   #generateAndSaveHTML(data) {
 
-    let start = Date.now();
+    //let start = Date.now();
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
       const template = document.createElement("template");
       if(this.#loadingStarted > 0){
-        const current = Date.now();
-        const loadTime = current - this.#loadingStarted;
+        //const current = Date.now();
+        //const loadTime = current - this.#loadingStarted;
 
         this.#loadingStarted = 0;
         
@@ -479,11 +504,11 @@ class BaseDynamicComponent extends HTMLElement {
 
       this.innerHTML = "";
       this.#renderTemplates(data,template.content);
-      console.log(Date.now()-start);
+      //console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
     } else {
       this.#renderTemplates(data,this);
-      console.log(Date.now()-start);
+      //console.log(Date.now()-start);
     }
   }
 }
