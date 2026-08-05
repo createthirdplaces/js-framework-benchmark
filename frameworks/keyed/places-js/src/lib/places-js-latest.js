@@ -354,22 +354,71 @@ class BaseDynamicComponent extends HTMLElement {
       const newIds = new Set(updatedOrdering);
 
       let removed = prevIds.difference(newIds);
-      let added = newIds.difference(newIds);
+      let added = newIds.difference(prevIds);
 
-      if(added.size > 0){
-        //console.log("Adding"); 
-      }
-      
-      if(removed.size > 0) {
-        const self = this;
-        removed.forEach((id)=>{ 
-          const node = self.getRootNode().getElementById(""+id);
-          node.parentNode.removeChild(node);
+      if(added.size > 0 && prevIds.size > 0){
+        
+        let addFragment = null;
 
-          const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
-          BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
-        });
+        for(let num = 0; num < updatedOrdering.length; num++){
+          const updateData = updatedOrdering[num]; 
+          if(added.has(updateData.id)){
+          
+            if(addFragment === null){
+              addFragment = document.createDocumentFragment();
+            }
+            
+            const rowProps = {...updateData}
+
+            for(let j=0;j<attrs.length;j++){
+              if(attrs[j].name !== "data-array"){
+                if(attrs[j].value.startsWith("data")){
+                  const itemKey = attrs[j].value.split('.')[1];
+                  rowProps[attrs[j].name]= data[itemKey];
+                }
+              }
+            }
+
+            let addNode = templateNode.cloneNode(true);
+            const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+            for(let sNum=0;sNum<signalsToRun.length;sNum++){
+              signalsToRun[sNum](rowProps,addNode.content,sNum);
+            } 
+            addFragment.appendChild(updatedNode.content);
+          }else {
+            if(addFragment !== null){
+              const curNode = this.getRootNode().getElementById(""+updateData.id); 
+              curNode.parent.insertBefore(addFragment,curNode); 
+              addFragment = null;
+            }
+          }
+        }
+        
+        if(addFragment !== null){
+          const lastId = updatedOrdering[updateOrdering.length-1].id
+          const lastNode = this.getRootNode().getElementById(""+lastId.id);
+          lastNode.parent.appendChild(addFragment);
+        }
         replace = false;
+        console.log("Adding"); 
+      }
+ 
+      if(removed.size > 0) {
+        //All the nodes have been removed. 
+        if(newIds.size === 0) {
+          replace = true;
+        }
+        else {
+          const self = this;
+          removed.forEach((id)=>{ 
+            const node = self.getRootNode().getElementById(""+id);
+            node.parentNode.removeChild(node);
+
+            const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
+            BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
+          });
+          replace = false;
+        }
       }
 
       /*
