@@ -400,7 +400,6 @@ class BaseDynamicComponent extends HTMLElement {
           lastNode.parent.appendChild(addFragment);
         }
         replace = false;
-        console.log("Adding"); 
       }
  
       if(removed.size > 0) {
@@ -427,13 +426,42 @@ class BaseDynamicComponent extends HTMLElement {
        * adding and removing nodes, nodes have been moved.
        */
       if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
-        let hasDiff = false;  
+        let moveNodes = [];
         for(let num=0;num<updatedOrdering.length;num++){
           if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName][num]){
-            hasDiff = true; 
+          
+            let insertBefore = null;
+            if (num < updatedOrdering.length -1){
+             
+              insertBefore = this.getRootNode().getElementById(
+                ""+updatedOrdering[num+1]);
+            }
+            moveNodes.push({
+              moveId:updatedOrdering[num],
+              prevNode:insertBefore
+            }); 
           }
-        } 
-        replace = hasDiff;
+        }
+        
+        if(moveNodes.length > 0){
+          for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
+           
+            const moveData = moveNodes[mNum];
+
+            const nodeToMove = this.getRootNode().getElementById(
+              moveData.moveId);
+          
+            if(moveData.prevNode !== null){
+              moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
+            } else {
+              nodeToMove.parentNode.appendChild(nodeToMove);
+            }
+          }
+        }
+        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
+        //console.log(hasDiff);
+
+        replace = false;
       }else {
         replace = true;
       }
@@ -507,6 +535,7 @@ class BaseDynamicComponent extends HTMLElement {
       }
 
       if(replace){
+        console.log("Replace");
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
         templates[i].replaceChildren(fragment);
       }
