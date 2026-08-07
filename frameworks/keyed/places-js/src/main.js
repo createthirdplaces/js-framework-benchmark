@@ -112,8 +112,7 @@ const TableItem = () => {
     return result;
   };
   
-  return`
-    <tr {{id=id}} {{className=selected}}>
+  return`<tr {{id=id}} {{className=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
         <td class="col-md-4">
           <a data-action="select" 
@@ -124,7 +123,7 @@ const TableItem = () => {
         </td>
         <td class="col-md-1">
           <a>
-            <span 
+            <span
               class="glyphicon glyphicon-remove" 
               aria-hidden="true"
               data-action="remove"
@@ -218,11 +217,11 @@ export class MainElement extends BaseDynamicComponent {
             </div>
             <table style="table-layout:fixed" class="table table-hover table-striped test-data" >
                 <tbody
+                    id="123456"
                     data-array=data
                     data-template-name=TableItem
                     selected=data.selected
-                >
-               </tbody>
+                ></tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
         </div>`;

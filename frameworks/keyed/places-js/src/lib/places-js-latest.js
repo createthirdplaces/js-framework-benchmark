@@ -141,7 +141,10 @@ class BaseDynamicComponent extends HTMLElement {
   #loadingIndicatorConfig;
   #subscribedStores = [];
 
-	//Stores state for the component.
+
+  #templateData = null;
+	
+  //Stores state for the component.
   componentStore = {};
   #templateLoaded = false;
 
@@ -189,7 +192,7 @@ class BaseDynamicComponent extends HTMLElement {
 
         let updated = signalData[fieldName]; 
         let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-     
+    
         //Set attribute on root node as the default case.
         if(!element){
           element=elementRoot;
@@ -326,17 +329,44 @@ class BaseDynamicComponent extends HTMLElement {
   }
 
   #renderTemplates(data,content) {
- 
-    const templates= content.querySelectorAll("[data-template-name]");
+
+    if(!this.#templateData){
+
+      this.#templateData = [];
+      const templates = content.querySelectorAll("[data-template-name]");
+      
+      for(let i=0;i<templates.length;i++){
+        let attrMap = {};
+        const attrNames = templates[i].getAttributeNames();
+        for(let j=0;j<attrNames.length;j++){
+          const attrName = attrNames[j];
+          const attrValue = templates[i].getAttribute(attrName);
+          if(attrValue.startsWith("data")|| attrName.startsWith("data")){
+            //templates[i].removeAttribute(attrName);
+          }
+          attrMap[attrName] = attrValue;
+        }   
+        this.#templateData.push({
+          container:templates[i],
+          attributes:attrMap
+        });
+      } 
+    }    
+    
     let domParser = new DOMParser();
 
-    for(let i = 0; i < templates.length;i++){
+    for(let i = 0; i < this.#templateData.length;i++){
 
-      const templateName = templates[i].getAttribute("data-template-name").toUpperCase();  
+      const templateContainer = this.#templateData[i].container; 
+      const attrs = this.#templateData[i].attributes;
+
+      const templateName = attrs["data-template-name"].toUpperCase();  
       const templateNode = BaseDynamicComponent.templates[templateName]; 
-      const state = data[templates[i].getAttribute("data-array")] || []; 
-      
-      const attrs = templates[i].attributes; 
+      console.log(templateNode.innerHTML);
+      const state = data[attrs["data-array"]] || []; 
+    
+      console.log("Updating:"+templateName);
+
       let props = {};
       
       const nodes = []; 
@@ -459,7 +489,6 @@ class BaseDynamicComponent extends HTMLElement {
           }
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
-        //console.log(hasDiff);
 
         replace = false;
       }else {
@@ -501,7 +530,7 @@ class BaseDynamicComponent extends HTMLElement {
         });
                
         Object.keys(itemState).forEach(propName=>{
-          const propType = typeof rowProps[propName]; 
+          const propType = typeof rowProps[propName];
           if(propType === 'number' || propType === 'string'){
             equalState = equalState && rowProps[propName] === prevProps[propName];
           };
@@ -528,7 +557,10 @@ class BaseDynamicComponent extends HTMLElement {
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
             for(let sNum=0;sNum<signalsToRun.length;sNum++){
               signalsToRun[sNum](rowProps,updatedNode.content,sNum);
-            } 
+            }
+            console.log(updatedNode.content);
+            console.log(templateNode.content);
+
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
         }
@@ -536,19 +568,23 @@ class BaseDynamicComponent extends HTMLElement {
 
       if(replace){
         console.log("Replace");
+        console.log(fragment);
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
-        templates[i].replaceChildren(fragment);
+        templateContainer.replaceChildren(fragment);
+        console.log(templateContainer);
+        console.log(document.getElementById("123456").innerHTML);
       }
     }
     
-     if(templates.length >= 0){
+     if(this.#templateData.length >= 0){
       this.#templateLoaded = true;
     }
+      console.log(document.getElementById("123456"));
   }
   
   #generateAndSaveHTML(data) {
 
-    //let start = Date.now();
+    let start = Date.now();
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
@@ -582,11 +618,12 @@ class BaseDynamicComponent extends HTMLElement {
 
       this.innerHTML = "";
       this.#renderTemplates(data,template.content);
-      //console.log(Date.now()-start);
+      console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
     } else {
       this.#renderTemplates(data,this);
-      //console.log(Date.now()-start);
+      console.log("Template rendered again");
+      console.log(Date.now()-start);
     }
   }
 }
