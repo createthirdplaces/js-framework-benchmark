@@ -115,8 +115,7 @@ const TableItem = () => {
   return`<tr {{id=id}} {{class=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
         <td class="col-md-4">
-          <a data-action="select" 
-            {{data-id=id}}
+          <a 
             {{textContent=label}}
             >
             </a>
@@ -126,8 +125,6 @@ const TableItem = () => {
             <span
               class="glyphicon glyphicon-remove" 
               aria-hidden="true"
-              data-action="remove"
-              {{data-id=id}}
             >
             </span>
           </a>
@@ -172,11 +169,11 @@ export class MainElement extends BaseDynamicComponent {
             else if (e.target.id === 'swaprows') {
                 this.swapRows();
             }
-            else if (e.target.dataset.action === 'remove') {
-                this.remove(e.target.dataset.id);
+            else if (e.target.tagName === 'A') {
+                this.select(e.target.parentNode.parentNode.id);
             }
-            else if (e.target.dataset.action === 'select') {
-                this.select(e.target.dataset.id);
+            else if (e.target.tagName === 'SPAN') {
+                this.remove(e.target.parentNode.parentNode.parentNode.id);
             } 
 
     });
@@ -215,7 +212,7 @@ export class MainElement extends BaseDynamicComponent {
                     </div>
                 </div>
             </div>
-            <table style="table-layout:fixed" class="table table-hover table-striped test-data" >
+            <table class="table table-hover table-striped test-data" >
                 <tbody
                     id="123456"
                     data-array=data
