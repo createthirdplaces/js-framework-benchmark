@@ -139,6 +139,9 @@ class BaseDynamicComponent extends HTMLElement {
   #loadingFromStores = new Set();
   #loadingStarted = 0;
   #loadingIndicatorConfig;
+  
+  #templateData = null;
+  #templateContainers = null;
   #subscribedStores = [];
 
 	//Stores state for the component.
@@ -194,14 +197,17 @@ class BaseDynamicComponent extends HTMLElement {
         if(!element){
           element=elementRoot;
         }
-        if(attr==="textContent"){
-          element.textContent = updated;
-        } else if (attr === "className"){
-          element.className = updated; 
-        } else {
-          element.setAttribute(attr,`${updated}`);
+
+        if(updated === '') {
+          element.removeAttribute(attr);
         }
-       
+        else {
+          if(attr==="textContent"){
+            element.textContent = updated;
+          } else {
+            element.setAttribute(attr,`${updated}`);
+          }
+        } 
       }
 
       templateStr = templateStr.substring(0,stateVarPos) +
@@ -330,13 +336,41 @@ class BaseDynamicComponent extends HTMLElement {
     const templates= content.querySelectorAll("[data-template-name]");
     let domParser = new DOMParser();
 
+    if(!this.#templateData){
+      this.#templateData = [] 
+      for(let i=0;i<templates.length;i++){
+        let attrs = [];
+        const attrNames = templates[i].getAttributeNames();
+        const dataFieldName = templates[i].getAttribute("data-array");
+        const dataTemplateName = templates[i].getAttribute("data-template-name");
+        for(let j=0;j<attrNames.length;j++){
+          const attrName = attrNames[j]; 
+          const attrValue = templates[i].getAttribute(attrName);
+          if(attrName.startsWith("data")||attrValue.startsWith("data")){
+            if(attrName !== "data-template-name"){
+              templates[i].removeAttribute(attrName);
+            }
+          }
+          attrs.push({
+            name:attrName,
+            value:attrValue
+          });
+        }   
+        this.#templateData.push({
+          attributes:attrs,
+          dataFieldName:dataFieldName,
+          dataTemplateName: dataTemplateName
+        });
+      } 
+    }
+    
     for(let i = 0; i < templates.length;i++){
-
-      const templateName = templates[i].getAttribute("data-template-name").toUpperCase();  
+       
+      const templateName = this.#templateData[i].dataTemplateName.toUpperCase();  
       const templateNode = BaseDynamicComponent.templates[templateName]; 
-      const state = data[templates[i].getAttribute("data-array")] || []; 
+      const state = data[this.#templateData[i].dataFieldName] || []; 
       
-      const attrs = templates[i].attributes; 
+      const attrs = this.#templateData[i].attributes; 
       let props = {};
       
       const nodes = []; 
@@ -459,7 +493,6 @@ class BaseDynamicComponent extends HTMLElement {
           }
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
-        //console.log(hasDiff);
 
         replace = false;
       }else {
@@ -548,14 +581,14 @@ class BaseDynamicComponent extends HTMLElement {
   
   #generateAndSaveHTML(data) {
 
-    //let start = Date.now();
+    let start = Date.now();
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
       const template = document.createElement("template");
       if(this.#loadingStarted > 0){
-        //const current = Date.now();
-        //const loadTime = current - this.#loadingStarted;
+        const current = Date.now();
+        const loadTime = current - this.#loadingStarted;
 
         this.#loadingStarted = 0;
         
@@ -582,11 +615,11 @@ class BaseDynamicComponent extends HTMLElement {
 
       this.innerHTML = "";
       this.#renderTemplates(data,template.content);
-      //console.log(Date.now()-start);
+      console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
     } else {
       this.#renderTemplates(data,this);
-      //console.log(Date.now()-start);
+      console.log(Date.now()-start);
     }
   }
 }
