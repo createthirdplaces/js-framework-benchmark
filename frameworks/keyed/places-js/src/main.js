@@ -141,7 +141,8 @@ export class MainElement extends BaseDynamicComponent {
         dataStore:store
       }]
     );
-    
+
+		this.style="display:block";    
     const self = this;
     this.addEventListener("click", e=> {
           e.preventDefault();
