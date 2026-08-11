@@ -154,6 +154,7 @@ class BaseDynamicComponent extends HTMLElement {
   static dynamicSignals = {};
   static prevState = {}; 
   static prevOrdering = {};
+  static eventHandlers = {};
 
   static defineTemplate(templateFunc, templateName){
 
@@ -164,7 +165,9 @@ class BaseDynamicComponent extends HTMLElement {
     let dynamicSignals = {};
 
     BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
-    
+   
+    BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupEventHandlers;
+
     //TOOD: Optimize peformance. 
     const start = Date.now();
     let i = 0;
@@ -264,8 +267,12 @@ class BaseDynamicComponent extends HTMLElement {
 
     this.updateFromSubscribedStores();
   }
- 
-	/**
+
+  addClickEventListeners(eventListeners){
+    this.clickEventListeners = eventListeners;
+  }
+	
+  /**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
 	 * replaces UI components and disables any user events.
 	 **/
@@ -431,7 +438,12 @@ class BaseDynamicComponent extends HTMLElement {
             Object.keys(signalsToRun).forEach((sNum)=>{ 
               signalsToRun[sNum](rowProps,addNode.content,sNum);
             })
-            
+           
+            const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
+            if(eventHandlers){
+              eventHandlers(updatedNode.content.firstChild, rowProps);
+            }
+
             addFragment.appendChild(updatedNode.content);
           }else {
             if(addFragment !== null){
@@ -563,9 +575,15 @@ class BaseDynamicComponent extends HTMLElement {
           else {
             updatedNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+            const computed = Object.keys(BaseDynamicComponent.computedProps[templateName]);
             Object.keys(signalsToRun).forEach((sNum)=>{ 
               signalsToRun[sNum](rowProps,updatedNode.content,sNum); 
             });
+            const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
+            if(eventHandlers){
+              eventHandlers(updatedNode.content.firstChild, rowProps);
+            }
+
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
         }
@@ -620,6 +638,25 @@ class BaseDynamicComponent extends HTMLElement {
       this.#renderTemplates(data,template.content);
       console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
+
+      if(this.clickEventListeners){
+        const selectors = Object.keys(this.clickEventListeners);
+        if(selectors.length > 0) {
+          selectors.forEach(selector=>{
+            console.log(selector);
+            const element = this.getRootNode().querySelector(selector);
+            if(!element){
+              console.error(`Invalid selector ${selector} for click event handler`);
+            }
+            else {
+              element.addEventListener("click",(e)=>{
+                e.preventDefault();
+                this.clickEventListeners[selector]();
+              });
+            }
+          });
+        }
+      }
     } else {
       this.#renderTemplates(data,this);
       console.log(Date.now()-start);

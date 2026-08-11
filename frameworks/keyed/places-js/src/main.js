@@ -115,6 +115,17 @@ const TableItem = () => {
   TableItem.label = (params)=>{
     return params.label;
   }
+
+  TableItem.setupEventHandlers = (templateRoot,params)=>{
+    templateRoot.addEventListener("click",(e)=>{
+      if (e.target.tagName === 'A') {
+        store.select(params.id); 
+      }
+      else if (e.target.tagName === 'SPAN') {
+        store.delete(params.id); 
+      } 
+    });
+  };
   
   return`<tr {{id=id}} {{class=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
@@ -138,7 +149,6 @@ const TableItem = () => {
 }
 BaseDynamicComponent.defineTemplate(TableItem,"TableItem");
 
-
 export class MainElement extends BaseDynamicComponent {
   constructor(){
     super([{
@@ -148,42 +158,16 @@ export class MainElement extends BaseDynamicComponent {
 
 		this.style="display:block";    
     const self = this;
-    this.addEventListener("click", e=> {
-          e.preventDefault();
-          if (e.target.id === 'add') {
-                this.add();
-            }
-            else if (e.target.id === 'run') {
-                this.run();
-            }
-            else if (e.target.id === 'update') {
-                this.update();
-            }
-            else if (e.target.id === 'hideall') {
-                this.hideAll();
-            }
-            else if (e.target.id === 'showall') {
-                this.showAll();
-            }
-            else if (e.target.id === 'runlots') {
-                this.runLots();
-            }
-            else if (e.target.id === 'clear') {
-                this.clear();
-            }
-            else if (e.target.id === 'swaprows') {
-                this.swapRows();
-            }
-            else if (e.target.tagName === 'A') {
-                this.select(e.target.parentNode.parentNode.id);
-            }
-            else if (e.target.tagName === 'SPAN') {
-                this.remove(e.target.parentNode.parentNode.parentNode.id);
-            } 
 
+    this.addClickEventListeners({
+      "#add": ()=>store.add(),
+      "#run": ()=>store.run(),
+      "#update":()=>store.update(),
+      "#runlots":()=>store.runLots(),
+      "#clear":()=>store.clear(),
+      "#swapRows":()=>store.swapRows()
     });
   }
-
   
   render(data){
     const html = `
@@ -228,32 +212,7 @@ export class MainElement extends BaseDynamicComponent {
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
         </div>`;
         return html;
-    }
-
-    add() {
-        store.add();
-    }
-    remove(id) {
-        store.delete(id);
-    }
-    select(id) {
-        store.select(id);
-    }
-    run() {
-        store.run();
-    }
-    update() {
-        store.update();
-    }
-    runLots() {
-        store.runLots();
-    }
-    clear() {
-        store.clear();
-    }
-    swapRows() {
-        store.swapRows();
-    }
+    } 
 }
 
 customElements.define("main-element", MainElement);
