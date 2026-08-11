@@ -120,19 +120,6 @@ class ApiLoadAction{
   }
 }
 
-/*
-function freezeState(state){
-  if(!state || JSON.stringify(state)==='{}'){
-    return {};
-  }
-  for (let [key, value] of Object.entries(state)) {
-    if (state.hasOwnProperty(key) && typeof value == "object") {
-      freezeState(value);
-    }
-  }
-  return Object.freeze(state);
-}*/
-
 class BaseDynamicComponent extends HTMLElement {
 
   #attachedEventsToShadowRoot = false;
@@ -197,24 +184,35 @@ class BaseDynamicComponent extends HTMLElement {
       const signal = (signalData,elementRoot,signalId)=>{
 
         let updated = signalData[fieldName]; 
-        let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-       
+
+        let element;
+
+        console.log(signalId);
+        if(true){
+          console.log("query");
+         element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
+        } 
         //Set attribute on root node as the default case.
         if(!element){
           element=elementRoot;
         }
 
+
+        //console.log(element); 
         if(updated === '') {
-          element.removeAttribute(attr);
+          //element.removeAttribute(attr);
         }
         else {
           if(attr==="textContent"){
-            element.textContent = updated;
+            if(element.textContent !== updated){
+              element.textContent = updated;
+            }
           } else {
             element.setAttribute(attr,`${updated}`);
           }
         }
 
+        //console.log(element);
         //Remove attributes that are not dynamic.
         if(templateFuncType !== 'function'){
           element.removeAttribute(`data-signal-id-${signalId}`); 
@@ -354,10 +352,14 @@ class BaseDynamicComponent extends HTMLElement {
 
   #renderTemplates(data,content) {
  
-    const templates= content.querySelectorAll("[data-template-name]");
-    let domParser = new DOMParser();
 
     if(!this.#templateData){
+
+      const templates = content.querySelectorAll("[data-template-name]");
+      if(templates.length >= 0){
+        this.#templateLoaded = true;
+      }
+
       this.#templateData = [] 
       for(let i=0;i<templates.length;i++){
         let attrs = [];
@@ -385,7 +387,7 @@ class BaseDynamicComponent extends HTMLElement {
       } 
     }
     
-    for(let i = 0; i < templates.length;i++){
+    for(let i = 0; i < this.#templateData.length;i++){
        
       const templateName = this.#templateData[i].dataTemplateName.toUpperCase();  
       const templateNode = BaseDynamicComponent.templates[templateName]; 
@@ -564,11 +566,12 @@ class BaseDynamicComponent extends HTMLElement {
           if(!replace){
             if(!equalState){
               const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
-       
+    
+              
               Object.keys(signalsToRun).forEach((sNum)=>{
                 signalsToRun[sNum](
                   rowProps,
-                  this.getRootNode().getElementById(""+id), 
+                  document.getElementById(""+id), 
                   sNum);
 
               });
@@ -598,25 +601,22 @@ class BaseDynamicComponent extends HTMLElement {
 
       if(replace){
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
-        templates[i].replaceChildren(fragment);
+        content.querySelectorAll("[data-template-name]")[i].replaceChildren(fragment);
+
       }
     }
     
-     if(templates.length >= 0){
-      this.#templateLoaded = true;
-    }
   }
  
   #setupClickEventListeners(rootNode,clickEventListeners,params) {
     const selectors = Object.keys(clickEventListeners);
     if(selectors.length > 0) {
       selectors.forEach(selector=>{
-        console.log(selector);
         const element = rootNode.querySelector(selector);
         if(!element){
           console.error(`Invalid selector ${selector} for click event handler`);
         }
-        else {
+        else {  
           element.addEventListener("click",(e)=>{
             e.preventDefault();
             clickEventListeners[selector](params);
@@ -662,7 +662,7 @@ class BaseDynamicComponent extends HTMLElement {
 
       this.innerHTML = "";
       this.#renderTemplates(data,template.content);
-      console.log(Date.now()-start);
+      //console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
 
       if(this.clickEventListeners){
@@ -670,7 +670,7 @@ class BaseDynamicComponent extends HTMLElement {
       }
     } else {
       this.#renderTemplates(data,this);
-      console.log(Date.now()-start);
+      //console.log(Date.now()-start);
     }
   }
 }
