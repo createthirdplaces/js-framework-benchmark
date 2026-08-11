@@ -111,6 +111,10 @@ const TableItem = () => {
     const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
     return result;
   };
+
+  TableItem.label = (params)=>{
+    return params.label;
+  }
   
   return`<tr {{id=id}} {{class=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>

@@ -151,6 +151,7 @@ class BaseDynamicComponent extends HTMLElement {
   static computedProps = {};
   static templates = {};
   static templateSignals = {};
+  static dynamicSignals = {};
   static prevState = {}; 
   static prevOrdering = {};
 
@@ -159,8 +160,8 @@ class BaseDynamicComponent extends HTMLElement {
     let template = document.createElement("template");
     let templateStr = templateFunc();
 
-    let signals = [];
-
+    let signals = {};
+    let dynamicSignals = {};
 
     BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
     
@@ -182,8 +183,9 @@ class BaseDynamicComponent extends HTMLElement {
       let newStr = "";
       newStr+=`data-signal-id-${i}`;
 
-      
-      if((typeof templateFunc[fieldName]) == 'function'){
+     
+      const templateFuncType = typeof templateFunc[fieldName];
+      if(templateFuncType === 'function'){
         BaseDynamicComponent.computedProps[templateName.toUpperCase()][fieldName] = templateFunc[fieldName];
 
       }
@@ -192,7 +194,7 @@ class BaseDynamicComponent extends HTMLElement {
 
         let updated = signalData[fieldName]; 
         let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-     
+       
         //Set attribute on root node as the default case.
         if(!element){
           element=elementRoot;
@@ -207,16 +209,27 @@ class BaseDynamicComponent extends HTMLElement {
           } else {
             element.setAttribute(attr,`${updated}`);
           }
-        } 
-      }
+        }
+
+        //Remove attributes that are not dynamic.
+        if(templateFuncType !== 'function'){
+          element.removeAttribute(`data-signal-id-${signalId}`); 
+          const attrName = `[data-signal-id-${signalId}]`
+        }
+     }
 
       templateStr = templateStr.substring(0,stateVarPos) +
         newStr + templateStr.substring(endPos+2);
-      signals.push(signal);
+      signals[i]=signal;
+      if(templateFuncType === 'function'){
+        dynamicSignals[i] = signal;
+      }
       i++;
     }
 
     BaseDynamicComponent.templateSignals[templateName.toUpperCase()] = signals;
+   BaseDynamicComponent.dynamicSignals[templateName.toUpperCase()] = dynamicSignals;
+
 
     template.innerHTML = templateStr;
 
@@ -415,9 +428,10 @@ class BaseDynamicComponent extends HTMLElement {
 
             let addNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-            for(let sNum=0;sNum<signalsToRun.length;sNum++){
+            Object.keys(signalsToRun).forEach((sNum)=>{ 
               signalsToRun[sNum](rowProps,addNode.content,sNum);
-            } 
+            })
+            
             addFragment.appendChild(updatedNode.content);
           }else {
             if(addFragment !== null){
@@ -453,12 +467,7 @@ class BaseDynamicComponent extends HTMLElement {
           replace = false;
         }
       }
-
-      /*
-       * TODO: Handle case where nodes have moved. If length is the same
-       * and the ordering is differennt after processing
-       * adding and removing nodes, nodes have been moved.
-       */
+ 
       if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
         let moveNodes = [];
         for(let num=0;num<updatedOrdering.length;num++){
@@ -498,15 +507,7 @@ class BaseDynamicComponent extends HTMLElement {
       }else {
         replace = true;
       }
-        /*
-         * TODO
-         *  -Handle case where nodes are added
-         *  -Handle case where nodes are deleted.
-         *  -Handle case where nodes are moved. As a 
-         *  starting point, just receate the entire 
-         *  tree if there are multiple types of operations
-         */
-     
+        
       for(let num=0;num<state.length;num++){
       
         const id = state[num].id;
@@ -546,29 +547,31 @@ class BaseDynamicComponent extends HTMLElement {
           let updatedNode;
           if(!replace){
             if(!equalState){
-              const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-              for(let sNum=0;sNum<signalsToRun.length;sNum++){ 
+              const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
+       
+              Object.keys(signalsToRun).forEach((sNum)=>{
                 signalsToRun[sNum](
                   rowProps,
                   this.getRootNode().getElementById(""+id), 
                   sNum);
-              }
+
+              });
+              
               BaseDynamicComponent.prevState[templateName][id] = rowProps;
             } 
           }
           else {
             updatedNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-            for(let sNum=0;sNum<signalsToRun.length;sNum++){
-              signalsToRun[sNum](rowProps,updatedNode.content,sNum);
-            } 
+            Object.keys(signalsToRun).forEach((sNum)=>{ 
+              signalsToRun[sNum](rowProps,updatedNode.content,sNum); 
+            });
             fragment.appendChild(updatedNode.content);
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
         }
       }
 
       if(replace){
-        console.log("Replace");
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
         templates[i].replaceChildren(fragment);
       }
