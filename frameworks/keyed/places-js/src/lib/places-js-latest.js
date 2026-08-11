@@ -120,6 +120,7 @@ class ApiLoadAction{
   }
 }
 
+/*
 function freezeState(state){
   if(!state || JSON.stringify(state)==='{}'){
     return {};
@@ -130,7 +131,7 @@ function freezeState(state){
     }
   }
   return Object.freeze(state);
-}
+}*/
 
 class BaseDynamicComponent extends HTMLElement {
 
@@ -166,7 +167,7 @@ class BaseDynamicComponent extends HTMLElement {
 
     BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
    
-    BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupEventHandlers;
+    BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupClickEventHandlers;
 
     //TOOD: Optimize peformance. 
     const start = Date.now();
@@ -311,7 +312,7 @@ class BaseDynamicComponent extends HTMLElement {
   updateData(storeUpdates) {
     if (storeUpdates) {
       this.#componentIsRendering = true;
-      this.componentStore = {...this.componentStore,...freezeState(storeUpdates)};
+      this.componentStore = {...this.componentStore,...storeUpdates};
       this.#generateAndSaveHTML(this.componentStore);
       this.#componentIsRendering = false;
     }
@@ -441,7 +442,10 @@ class BaseDynamicComponent extends HTMLElement {
            
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
-              eventHandlers(updatedNode.content.firstChild, rowProps);
+              this.#setupClickEventListeners(
+                updatedNode.content.firstChild,
+                eventHandlers,
+                rowProps);
             }
 
             addFragment.appendChild(updatedNode.content);
@@ -581,7 +585,10 @@ class BaseDynamicComponent extends HTMLElement {
             });
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
-              eventHandlers(updatedNode.content.firstChild, rowProps);
+              this.#setupClickEventListeners(
+                updatedNode.content.firstChild,
+                eventHandlers,
+                rowProps);
             }
 
             fragment.appendChild(updatedNode.content);
@@ -597,6 +604,25 @@ class BaseDynamicComponent extends HTMLElement {
     
      if(templates.length >= 0){
       this.#templateLoaded = true;
+    }
+  }
+ 
+  #setupClickEventListeners(rootNode,clickEventListeners,params) {
+    const selectors = Object.keys(clickEventListeners);
+    if(selectors.length > 0) {
+      selectors.forEach(selector=>{
+        console.log(selector);
+        const element = rootNode.querySelector(selector);
+        if(!element){
+          console.error(`Invalid selector ${selector} for click event handler`);
+        }
+        else {
+          element.addEventListener("click",(e)=>{
+            e.preventDefault();
+            clickEventListeners[selector](params);
+          });
+        }
+      });
     }
   }
   
@@ -640,22 +666,7 @@ class BaseDynamicComponent extends HTMLElement {
       this.innerHTML = template.innerHTML;
 
       if(this.clickEventListeners){
-        const selectors = Object.keys(this.clickEventListeners);
-        if(selectors.length > 0) {
-          selectors.forEach(selector=>{
-            console.log(selector);
-            const element = this.getRootNode().querySelector(selector);
-            if(!element){
-              console.error(`Invalid selector ${selector} for click event handler`);
-            }
-            else {
-              element.addEventListener("click",(e)=>{
-                e.preventDefault();
-                this.clickEventListeners[selector]();
-              });
-            }
-          });
-        }
+        this.#setupClickEventListeners(this.getRootNode(),this.clickEventListeners);  
       }
     } else {
       this.#renderTemplates(data,this);
@@ -729,7 +740,7 @@ class DataStore {
    * @param storeUpdates Updated store data. Fields not specified in storeData will not be updated.
    */
   updateStoreData(storeUpdates){
-    this.#storeData = {...this.#storeData,...freezeState(storeUpdates)};
+    this.#storeData = {...this.#storeData,...storeUpdates};
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
       this.#componentSubscriptions[i].updateFromSubscribedStores();
     }

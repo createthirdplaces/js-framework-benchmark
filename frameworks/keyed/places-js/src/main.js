@@ -116,16 +116,11 @@ const TableItem = () => {
     return params.label;
   }
 
-  TableItem.setupEventHandlers = (templateRoot,params)=>{
-    templateRoot.addEventListener("click",(e)=>{
-      if (e.target.tagName === 'A') {
-        store.select(params.id); 
-      }
-      else if (e.target.tagName === 'SPAN') {
-        store.delete(params.id); 
-      } 
-    });
-  };
+  TableItem.setupClickEventHandlers = {
+    "a": (params)=>store.select(params.id),
+    "span": (params)=>store.delete(params.id)
+  }
+
   
   return`<tr {{id=id}} {{class=selected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
@@ -165,7 +160,7 @@ export class MainElement extends BaseDynamicComponent {
       "#update":()=>store.update(),
       "#runlots":()=>store.runLots(),
       "#clear":()=>store.clear(),
-      "#swapRows":()=>store.swapRows()
+      "#swaprows":()=>store.swapRows()
     });
   }
   
