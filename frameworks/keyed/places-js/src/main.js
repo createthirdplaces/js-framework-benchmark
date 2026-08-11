@@ -53,7 +53,6 @@ class Store extends DataStore {
     }
     
     select(id) {
-
       this.updateStoreData({
         selected:id
       });
@@ -117,7 +116,10 @@ const TableItem = () => {
   }
 
   TableItem.setupClickEventHandlers = {
-    "a": (params)=>store.select(params.id),
+    "a": (params)=>{
+      //document.getElementById(params.id).className = "danger"; 
+      store.select(params.id)
+    },
     "span": (params)=>store.delete(params.id)
   }
 
