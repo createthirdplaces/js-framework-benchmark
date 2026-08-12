@@ -252,7 +252,6 @@ class BaseDynamicComponent extends HTMLElement {
       element=elementRoot;
     }
 
-
     if(updated === '') {
       //console.log("removing:"+attr);
       element.removeAttribute(attr);
@@ -420,18 +419,23 @@ class BaseDynamicComponent extends HTMLElement {
       let added = newIds.difference(prevIds);
 
       if(added.size > 0 && prevIds.size > 0){
-        
+       
+
+        const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
         let addFragment = null;
 
+        
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
-          if(added.has(updateData.id)){
           
+          if(added.has(updateData)){
+         
             if(addFragment === null){
               addFragment = document.createDocumentFragment();
             }
-            
-            const rowProps = {...updateData}
+           
+            const itemState = state[num];        
+            const rowProps = {...itemState}
 
             for(let j=0;j<attrs.length;j++){
               if(attrs[j].name !== "data-array"){
@@ -444,15 +448,17 @@ class BaseDynamicComponent extends HTMLElement {
 
             let addNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-            Object.keys(signalsToRun).forEach((sNum)=>{ 
 
-             if(rowProps[signalsToRun[sNum].fieldName]){
+            Object.keys(signalsToRun).forEach((sNum)=>{ 
+              
+              
+              if(rowProps[signalsToRun[sNum].fieldName]){
                 this.#generateSignal(
                   {
                     ...signalsToRun[sNum],
                     ...{
                       "signalData":rowProps,
-                      "elementRoot":updatedNode.content, 
+                      "elementRoot":addNode.content, 
                       "signalId":sNum
                     }
                   }
@@ -460,15 +466,17 @@ class BaseDynamicComponent extends HTMLElement {
               }
             })
            
+            BaseDynamicComponent.prevState[templateName][updateData] = rowProps;
+
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
               this.#setupClickEventListeners(
-                updatedNode.content.firstChild,
+                addNode.content.firstChild,
                 eventHandlers,
                 rowProps);
             }
 
-            addFragment.appendChild(updatedNode.content);
+            addFragment.appendChild(addNode.content);
           }else {
             if(addFragment !== null){
               const curNode = this.getRootNode().getElementById(""+updateData.id); 
@@ -479,13 +487,16 @@ class BaseDynamicComponent extends HTMLElement {
         }
         
         if(addFragment !== null){
-          const lastId = updatedOrdering[updateOrdering.length-1].id
-          const lastNode = this.getRootNode().getElementById(""+lastId.id);
-          lastNode.parent.appendChild(addFragment);
+          const lastNode = this.getRootNode().getElementById(""+lastId);
+          lastNode.parentNode.appendChild(addFragment);
         }
         replace = false;
+        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
+
       }
- 
+
+     
+
       if(removed.size > 0) {
         //All the nodes have been removed. 
         if(newIds.size === 0) {
@@ -503,8 +514,10 @@ class BaseDynamicComponent extends HTMLElement {
           replace = false;
         }
       }
- 
+
+      let sameNumber = false;
       if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
+        sameNumber = true; 
         let moveNodes = [];
         for(let num=0;num<updatedOrdering.length;num++){
           if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName][num]){
@@ -540,8 +553,6 @@ class BaseDynamicComponent extends HTMLElement {
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
 
         replace = false;
-      }else {
-        replace = true;
       }
         
       for(let num=0;num<state.length;num++){
@@ -582,9 +593,9 @@ class BaseDynamicComponent extends HTMLElement {
        
           let updatedNode;
           if(!replace){
-            if(!equalState){
+            if(!equalState && sameNumber && prevProps.id){
               const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
-  
+ 
               Object.keys(signalsToRun).forEach((sNum)=>{
                 
                 const signalConfig = signalsToRun[sNum];
