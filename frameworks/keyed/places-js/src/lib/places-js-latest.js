@@ -680,7 +680,7 @@ class BaseDynamicComponent extends HTMLElement {
   
   #generateAndSaveHTML(data) {
 
-    let start = Date.now();
+    //let start = Date.now();
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
