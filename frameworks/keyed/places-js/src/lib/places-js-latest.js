@@ -253,7 +253,6 @@ class BaseDynamicComponent extends HTMLElement {
     }
 
     if(updated === '') {
-      //console.log("removing:"+attr);
       element.removeAttribute(attr);
     }
     else {
@@ -418,9 +417,9 @@ class BaseDynamicComponent extends HTMLElement {
       let removed = prevIds.difference(newIds);
       let added = newIds.difference(prevIds);
 
+      let hasReplaced = false;
       if(added.size > 0 && prevIds.size > 0){
        
-
         const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
         let addFragment = null;
 
@@ -487,17 +486,19 @@ class BaseDynamicComponent extends HTMLElement {
         }
         
         if(addFragment !== null){
-          const lastNode = this.getRootNode().getElementById(""+lastId);
-          lastNode.parentNode.appendChild(addFragment);
+          if(added.size < newIds.size ) { 
+            const lastNode = this.getRootNode().getElementById(""+lastId);
+            lastNode.parentNode.appendChild(addFragment);
+          } else{
+            content.querySelectorAll("[data-template-name]")[i].replaceChildren(addFragment);
+            hasReplaced = true; 
+          }          
         }
         replace = false;
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
-
       }
-
-     
-
-      if(removed.size > 0) {
+ 
+      if(removed.size > 0 && prevIds.size !== added.size) {
         //All the nodes have been removed. 
         if(newIds.size === 0) {
           replace = true;
@@ -554,7 +555,11 @@ class BaseDynamicComponent extends HTMLElement {
 
         replace = false;
       }
-        
+       
+      if(hasReplaced){
+        break;
+      }
+      
       for(let num=0;num<state.length;num++){
       
         const id = state[num].id;
@@ -640,7 +645,7 @@ class BaseDynamicComponent extends HTMLElement {
 
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
-              this.#setupClickEventListeners(
+                this.#setupClickEventListeners(
                 updatedNode.content.firstChild,
                 eventHandlers,
                 rowProps);
@@ -654,7 +659,6 @@ class BaseDynamicComponent extends HTMLElement {
       if(replace){
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
         content.querySelectorAll("[data-template-name]")[i].replaceChildren(fragment);
-
       }
     }
     
