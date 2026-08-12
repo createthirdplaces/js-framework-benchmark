@@ -688,7 +688,7 @@ class BaseDynamicComponent extends HTMLElement {
       });
     }
   }
-  
+
   #generateAndSaveHTML(data) {
 
     //let start = Date.now();
