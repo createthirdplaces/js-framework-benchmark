@@ -1,7 +1,7 @@
 import {BaseDynamicComponent,CustomLoadAction,DataStore} from "./lib/places-js-latest.js";
 
 function _random(max) {
-    return Math.round(Math.random()*1000)%max;
+  return Math.round(Math.random()*1000)%max;
 }
 
 class Store extends DataStore {
@@ -115,13 +115,7 @@ const TableItem = () => {
     return params.label;
   }
 
-  TableItem.setupClickEventHandlers = {
-    "a": (params)=>{
-      //document.getElementById(params.id).className = "danger"; 
-      store.select(params.id)
-    },
-    "span": (params)=>store.delete(params.id)
-  }
+  
 
   
   return`<tr {{id=id}} {{class=selected}}>
@@ -164,9 +158,32 @@ export class MainElement extends BaseDynamicComponent {
       "#clear":()=>store.clear(),
       "#swaprows":()=>store.swapRows()
     });
+
+    this.addEventListener("click",(e)=>{
+
+      if(e.target.nodeName === "A"){
+        store.select(e.target.parentNode.parentNode.id);
+      }
+      if(e.target.nodeName === "SPAN"){
+        console.log(e.target.parentNode.id);
+        store.delete(e.target.parentNode.parentNode.parentNode.id);
+      }
+      console.log(e.target.nodeName); 
+      /*
+       * TableItem.setupClickEventHandlers = {
+      "a": (params)=>{
+        //document.getElementById(params.id).className = "danger"; 
+        store.select(params.id)
+      },
+      "span": (params)=>store.delete(params.id)
+    }*/
+
+    });
+ 
   }
   
   render(data){
+    console.log(data);
     const html = `
         <div class="container">
             <div class="jumbotron">
