@@ -254,7 +254,7 @@ class BaseDynamicComponent extends HTMLElement {
 
 
     if(updated === '') {
-      console.log("removing:"+attr);
+      //console.log("removing:"+attr);
       element.removeAttribute(attr);
     }
     else {
