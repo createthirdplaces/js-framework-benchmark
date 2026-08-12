@@ -486,7 +486,8 @@ class BaseDynamicComponent extends HTMLElement {
         }
         
         if(addFragment !== null){
-          if(added.size < newIds.size ) { 
+
+          if(added.size < newIds.size - removed.size) { 
             const lastNode = this.getRootNode().getElementById(""+lastId);
             lastNode.parentNode.appendChild(addFragment);
           } else{
@@ -498,21 +499,27 @@ class BaseDynamicComponent extends HTMLElement {
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
       }
  
-      if(removed.size > 0 && prevIds.size !== added.size) {
-        //All the nodes have been removed. 
-        if(newIds.size === 0) {
-          replace = true;
-        }
-        else {
-          const self = this;
-          removed.forEach((id)=>{ 
-            const node = self.getRootNode().getElementById(""+id);
-            node.parentNode.removeChild(node);
+      if(removed.size > 0) {
 
-            const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
-            BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
-          });
-          replace = false;
+        removed.forEach((id)=>{
+            delete BaseDynamicComponent.prevState[templateName][id] 
+        });
+
+        if(!hasReplaced){
+          //All the nodes have been removed. 
+          if(newIds.size === 0) {
+            replace = true;
+          }
+          else {
+            const self = this;
+            removed.forEach((id)=>{ 
+              const node = self.getRootNode().getElementById(""+id);
+              node.parentNode.removeChild(node);
+              const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
+              BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
+            });
+            replace = false;
+          }
         }
       }
 
