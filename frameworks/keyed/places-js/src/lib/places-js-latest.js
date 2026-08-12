@@ -646,10 +646,10 @@ class BaseDynamicComponent extends HTMLElement {
           console.error(`Invalid selector ${selector} for click event handler`);
         }
         else {  
-          element.addEventListener("click",(e)=>{
+          element.onclick = (e)=>{
             e.preventDefault();
             clickEventListeners[selector](params);
-          });
+          };
         }
       });
     }
