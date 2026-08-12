@@ -144,6 +144,7 @@ class BaseDynamicComponent extends HTMLElement {
   static prevOrdering = {};
   static eventHandlers = {};
 
+  
   static defineTemplate(templateFunc, templateName){
 
     let template = document.createElement("template");
@@ -180,51 +181,18 @@ class BaseDynamicComponent extends HTMLElement {
         BaseDynamicComponent.computedProps[templateName.toUpperCase()][fieldName] = templateFunc[fieldName];
 
       }
-      
-      const signal = (signalData,elementRoot,signalId)=>{
-
-        let updated = signalData[fieldName]; 
-
-        let element;
-
-        console.log(signalId);
-        if(true){
-          console.log("query");
-         element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-        } 
-        //Set attribute on root node as the default case.
-        if(!element){
-          element=elementRoot;
-        }
-
-
-        //console.log(element); 
-        if(updated === '') {
-          //element.removeAttribute(attr);
-        }
-        else {
-          if(attr==="textContent"){
-            if(element.textContent !== updated){
-              element.textContent = updated;
-            }
-          } else {
-            element.setAttribute(attr,`${updated}`);
-          }
-        }
-
-        //console.log(element);
-        //Remove attributes that are not dynamic.
-        if(templateFuncType !== 'function'){
-          element.removeAttribute(`data-signal-id-${signalId}`); 
-          const attrName = `[data-signal-id-${signalId}]`
-        }
-     }
+     
+      const signalData = {
+        fieldName,
+        templateFuncType,
+        attr
+      } 
 
       templateStr = templateStr.substring(0,stateVarPos) +
         newStr + templateStr.substring(endPos+2);
-      signals[i]=signal;
+      signals[i]=signalData;
       if(templateFuncType === 'function'){
-        dynamicSignals[i] = signal;
+        dynamicSignals[i] = signalData;
       }
       i++;
     }
@@ -266,6 +234,48 @@ class BaseDynamicComponent extends HTMLElement {
 
     this.updateFromSubscribedStores();
   }
+
+
+ #generateSignal(params){
+
+
+  const{ signalData,
+    elementRoot,
+    signalId,
+    fieldName,
+    templateFuncType,
+    attr} = params
+  
+  let updated = signalData[fieldName]; 
+  let element;
+
+  element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
+  //Set attribute on root node as the default case.
+  if(!element){
+    element=elementRoot;
+  }
+
+
+  if(updated === '') {
+    element.removeAttribute(attr);
+  }
+  else {
+    if(attr==="textContent"){
+      if(element.textContent !== updated){
+        element.textContent = updated;
+      }
+    } else {
+      element.setAttribute(attr,`${updated}`);
+    }
+  }
+
+  //Remove attributes that are not dynamic.
+  if(templateFuncType !== 'function'){
+    element.removeAttribute(`data-signal-id-${signalId}`); 
+    const attrName = `[data-signal-id-${signalId}]`
+  }
+}
+
 
   addClickEventListeners(eventListeners){
     this.clickEventListeners = eventListeners;
@@ -439,7 +449,11 @@ class BaseDynamicComponent extends HTMLElement {
             let addNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
             Object.keys(signalsToRun).forEach((sNum)=>{ 
-              signalsToRun[sNum](rowProps,addNode.content,sNum);
+              this.#generateSignal(...signalsToRun[sNum],...{
+                "rowProps":rowProps,
+                "content":addNode.content,
+                "sNum":sNum
+              });
             })
            
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
@@ -566,13 +580,18 @@ class BaseDynamicComponent extends HTMLElement {
           if(!replace){
             if(!equalState){
               const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
-    
-              
+     
               Object.keys(signalsToRun).forEach((sNum)=>{
-                signalsToRun[sNum](
-                  rowProps,
-                  document.getElementById(""+id), 
-                  sNum);
+                this.#generateSignal(
+                  { 
+                    ...signalsToRun[sNum],
+                    ...{
+                      "signalData":rowProps,
+                      "elementRoot":document.getElementById(""+id),
+                      "signalId":sNum
+                    }
+                  }
+                );
 
               });
               
@@ -583,8 +602,18 @@ class BaseDynamicComponent extends HTMLElement {
             updatedNode = templateNode.cloneNode(true);
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
             const computed = Object.keys(BaseDynamicComponent.computedProps[templateName]);
-            Object.keys(signalsToRun).forEach((sNum)=>{ 
-              signalsToRun[sNum](rowProps,updatedNode.content,sNum); 
+            Object.keys(signalsToRun).forEach((sNum)=>{
+               
+              this.#generateSignal(
+                {
+                  ...signalsToRun[sNum],
+                  ...{
+                    "signalData":rowProps,
+                    "elementRoot":updatedNode.content, 
+                    "signalId":sNum
+                  }
+                }
+              );
             });
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
@@ -662,7 +691,6 @@ class BaseDynamicComponent extends HTMLElement {
 
       this.innerHTML = "";
       this.#renderTemplates(data,template.content);
-      //console.log(Date.now()-start);
       this.innerHTML = template.innerHTML;
 
       if(this.clickEventListeners){
@@ -670,7 +698,6 @@ class BaseDynamicComponent extends HTMLElement {
       }
     } else {
       this.#renderTemplates(data,this);
-      //console.log(Date.now()-start);
     }
   }
 }
