@@ -115,8 +115,8 @@ const TableItem = () => {
     return params.label;
   }
  
-  return`<tr {{id=id}} {{class=getSelected}}>
-      <td class="col-md-1" {{textContent=id}}>Test</td>
+  return`<tr {{class=getSelected}}>
+      <td class="col-md-1" {{textContent=id}}></td>
         <td class="col-md-4">
           <a 
             {{textContent=label}}
@@ -201,9 +201,8 @@ export class MainElement extends BaseDynamicComponent {
                     </div>
                 </div>
             </div>
-            <table class="table table-hover table-striped test-data" >
+            <table class="table table-hover table-striped test-data">
                 <tbody
-                    id="123456"
                     data-array=data
                     data-template-name=TableItem
                     selected=data.selected
