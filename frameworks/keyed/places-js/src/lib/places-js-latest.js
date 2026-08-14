@@ -152,8 +152,8 @@ class BaseDynamicComponent extends HTMLElement {
     let template = document.createElement("template");
     let templateStr = templateFunc();
 
-    let signals = {};
-    let dynamicSignals = {};
+    let signals = [];
+    let dynamicSignals = [];
 
     BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
    
@@ -187,14 +187,15 @@ class BaseDynamicComponent extends HTMLElement {
       const signalData = {
         fieldName,
         templateFuncType,
-        attr
+        attr,
+        "signalId":i
       } 
 
       templateStr = templateStr.substring(0,stateVarPos) +
         newStr + templateStr.substring(endPos+2);
-      signals[i]=signalData;
+      signals.push(signalData);
       if(templateFuncType === 'function'){
-        dynamicSignals[i] = signalData;
+        dynamicSignals.push(signalData);
       }
       i++;
     }
@@ -241,14 +242,19 @@ class BaseDynamicComponent extends HTMLElement {
 
     const{ 
       signalData,
-      element,
-      signalId,
+      elementRoot,
       fieldName,
       templateFuncType,
+      signalId,
       attr} = params
     
     let updated = signalData[fieldName]; 
-   
+    
+    let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
+    //Set attribute on root node as the default case.
+    if(!element){
+      element=elementRoot;
+    }
     if(updated === '') {
       element.removeAttribute(attr);
     }
@@ -346,28 +352,8 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-  #cloneTemplateNode(templateNode, signalCount, id){
-    let copy = templateNode.cloneNode(true);
-
-    
-    for(let i = 0; i < signalCount; i++){
-      const element = copy.content.querySelector(`[data-signal-id-${i}]`);
-
-      element.removeAttribute(`data-signal-id-${i}`);
-
-      if(i===0){
-        element.id = id;
-      }
-      else{
-        element.id = `${id}-${i}`;
-      }
-    }
-    return copy;
-  }
-  
-  #renderTemplates(data,content) {
+    #renderTemplates(data,content) {
  
-
     if(!this.#templateData){
 
       const templates = content.querySelectorAll("[data-template-name]");
@@ -415,11 +401,7 @@ class BaseDynamicComponent extends HTMLElement {
       const state = data[this.#templateData[i].dataFieldName] || []; 
       
       const attrs = this.#templateData[i].attributes; 
-      let props = {};
       
-      const nodes = []; 
-      const fragment = document.createDocumentFragment();
-
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
       const updatedOrdering = [];
@@ -475,23 +457,17 @@ class BaseDynamicComponent extends HTMLElement {
 
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
-            let addNode = 
-              this.#cloneTemplateNode(
-                templateNode,
-                Object.keys(signalsToRun).length,
-                rowProps.id
-              );
-            
-            Object.keys(signalsToRun).forEach((sNum)=>{ 
+            let addNode = templateNode.cloneNode(true);
+              
+            signalsToRun.forEach((signal)=>{ 
                     
-              if(rowProps[signalsToRun[sNum].fieldName]){
+              if(rowProps[signal.fieldName]){
                 this.#generateSignal(
                   {
-                    ...signalsToRun[sNum],
+                    ...signal,
                     ...{
                       "signalData":rowProps,
-                      "element":addNode.content.getElementById(rowProps.id+"-"+sNum) || addNode.content, 
-                      "signalId":rowProps.id+"-"+sNum
+                      "elementRoot":addNode.content,
                     }
                   }
                 );
@@ -634,18 +610,15 @@ class BaseDynamicComponent extends HTMLElement {
           if(!equalState){
             const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
 
-            Object.keys(signalsToRun).forEach((sNum)=>{
+            signalsToRun.forEach((signalConfig)=>{
               
-              const signalConfig = signalsToRun[sNum];
-            
               if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
                 this.#generateSignal(
                   { 
                     ...signalConfig,
                     ...{
                       "signalData":rowProps,
-                      "element":document.getElementById(id+"-"+sNum) || document.getElementById(""+id),
-                      "signalId":id+"-"+sNum
+                      "elementRoot": document.getElementById(""+id),
                     }
                   }
                 );
