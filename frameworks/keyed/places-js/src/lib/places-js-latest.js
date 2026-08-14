@@ -403,39 +403,50 @@ class BaseDynamicComponent extends HTMLElement {
       const nodes = []; 
       const fragment = document.createDocumentFragment();
 
-      let replace = true; 
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
       const updatedOrdering = [];
-      for(let num=0;num<state.length;num++){
-        updatedOrdering.push(state[num].id);
-      } 
+      
+      const prevIds = new Set();
+      const newIds = new Set();
 
-      const prevIds = new Set(BaseDynamicComponent.prevOrdering[templateName]);
-      const newIds = new Set(updatedOrdering);
-
-      let removed = prevIds.difference(newIds);
-      let added = newIds.difference(prevIds);
+      let sameLocs = true;
+      for(let num=0;num<Math.max(state.length,prevStateLen);num++){
+        if(num<state.length){
+          updatedOrdering.push(state[num].id);
+          newIds.add(state[num].id);
+        }
+        if(num < prevStateLen){
+          prevIds.add(BaseDynamicComponent.prevOrdering[templateName][num]);
+        }
+        if(!state[num] || state[num].id !== BaseDynamicComponent.prevOrdering[templateName][num]){
+          sameLocs = false; 
+        }
+      }
+    
+      const removed = sameLocs ? new Set() : prevIds.difference(newIds);
+      const added = sameLocs ? new Set() : newIds.difference(prevIds);
 
       let hasReplaced = false;
-      if(added.size > 0 && prevIds.size > 0){
-       
+      if(added.size > 0){
+
         const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
         let addFragment = null;
-
-        
+ 
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
-          
-          if(added.has(updateData)){
          
-            if(addFragment === null){
+          if(added.has(updateData)){
+          if(addFragment === null){
               addFragment = document.createDocumentFragment();
             }
            
             const itemState = state[num];        
             const rowProps = {...itemState}
 
+            Object.keys(BaseDynamicComponent.computedProps[templateName]).forEach((computedKey)=>{
+              rowProps[computedKey] = BaseDynamicComponent.computedProps[templateName][computedKey](rowProps);
+            });
             for(let j=0;j<attrs.length;j++){
               if(attrs[j].name !== "data-array"){
                 if(attrs[j].value.startsWith("data")){
@@ -449,8 +460,7 @@ class BaseDynamicComponent extends HTMLElement {
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
             Object.keys(signalsToRun).forEach((sNum)=>{ 
-              
-              
+                    
               if(rowProps[signalsToRun[sNum].fieldName]){
                 this.#generateSignal(
                   {
@@ -466,7 +476,6 @@ class BaseDynamicComponent extends HTMLElement {
             })
            
             BaseDynamicComponent.prevState[templateName][updateData] = rowProps;
-
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
               this.#setupClickEventListeners(
@@ -484,7 +493,7 @@ class BaseDynamicComponent extends HTMLElement {
             }
           }
         }
-        
+      
         if(addFragment !== null){
 
           if(added.size < newIds.size - removed.size) { 
@@ -495,22 +504,24 @@ class BaseDynamicComponent extends HTMLElement {
             hasReplaced = true; 
           }          
         }
-        replace = false;
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
       }
- 
+
+      
       if(removed.size > 0) {
+        
+        if(removed.size === prevIds.size && !hasReplaced){
+          content.querySelectorAll("[data-template-name]")[i].replaceChildren([]);
+          BaseDynamicComponent.prevState[templateName] = {};
+          break; 
+        }
 
         removed.forEach((id)=>{
             delete BaseDynamicComponent.prevState[templateName][id] 
         });
 
-        if(!hasReplaced){
-          //All the nodes have been removed. 
-          if(newIds.size === 0) {
-            replace = true;
-          }
-          else {
+        if(!hasReplaced){ 
+          if(newIds.size > 0) {
             const self = this;
             removed.forEach((id)=>{ 
               const node = self.getRootNode().getElementById(""+id);
@@ -518,13 +529,12 @@ class BaseDynamicComponent extends HTMLElement {
               const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
               BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
             });
-            replace = false;
           }
         }
       }
 
       let sameNumber = false;
-      if(updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
+      if(!hasReplaced && updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
         sameNumber = true; 
         let moveNodes = [];
         for(let num=0;num<updatedOrdering.length;num++){
@@ -560,115 +570,77 @@ class BaseDynamicComponent extends HTMLElement {
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
 
-        replace = false;
       }
        
       if(hasReplaced){
         break;
       }
-      
-      for(let num=0;num<state.length;num++){
-      
-        const id = state[num].id;
-        const itemState = state[num];        
-        const rowProps = {...itemState}
 
-        for(let j=0;j<attrs.length;j++){
-          if(attrs[j].name !== "data-array"){
-            if(attrs[j].value.startsWith("data")){
-              const itemKey = attrs[j].value.split('.')[1];
-              rowProps[attrs[j].name]= data[itemKey];
+      //Only should run for changes
+      if(sameNumber){
+        for(let num=0;num<state.length;num++){
+        
+          const id = state[num].id;
+          const itemState = state[num];        
+          const rowProps = {...itemState}
+
+          for(let j=0;j<attrs.length;j++){
+            if(attrs[j].name !== "data-array"){
+              if(attrs[j].value.startsWith("data")){
+                const itemKey = attrs[j].value.split('.')[1];
+                rowProps[attrs[j].name]= data[itemKey];
+              }
             }
           }
-        }
+          
+          let equalState = true;
         
-        let equalState = true;
-       
-        const prevProps = BaseDynamicComponent.prevState[templateName][""+id] || {};
-        
-        //Calculate computed values.
-        const computed = BaseDynamicComponent.computedProps[templateName];
-        Object.keys(computed).forEach((computedKey)=>{
-          rowProps[computedKey] = computed[computedKey](rowProps);
-          equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
-        });
-               
-        Object.keys(itemState).forEach(propName=>{
-          const propType = typeof rowProps[propName]; 
-          if(propType === 'number' || propType === 'string'){
-            equalState = equalState && rowProps[propName] === prevProps[propName];
-          };
-          if(propType === "object"){
-            equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
-          } 
-        });
-       
-          let updatedNode;
-          if(!replace){
-            if(!equalState && sameNumber && prevProps.id){
-              const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
- 
-              Object.keys(signalsToRun).forEach((sNum)=>{
-                
-                const signalConfig = signalsToRun[sNum];
-
-                if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
-                  this.#generateSignal(
-                    { 
-                      ...signalConfig,
-                      ...{
-                        "signalData":rowProps,
-                        "elementRoot":document.getElementById(""+id),
-                        "signalId":sNum
-                      }
-                    }
-                  );
-                }
-
-              });
-              
-              BaseDynamicComponent.prevState[templateName][id] = rowProps;
+          const prevProps = BaseDynamicComponent.prevState[templateName][""+id]          
+          //Calculate computed values.
+          const computed = BaseDynamicComponent.computedProps[templateName];
+          Object.keys(computed).forEach((computedKey)=>{
+            rowProps[computedKey] = computed[computedKey](rowProps);
+            equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
+          });
+                 
+          Object.keys(itemState).forEach(propName=>{
+            const propType = typeof rowProps[propName]; 
+            if(propType === 'number' || propType === 'string'){
+              equalState = equalState && rowProps[propName] === prevProps[propName];
+            };
+            if(propType === "object"){
+              equalState = equalState && Object.is(rowProps[propName],prevProps[propName]);
             } 
-          }
-          else {
-            updatedNode = templateNode.cloneNode(true);
-            const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
-            const computed = Object.keys(BaseDynamicComponent.computedProps[templateName]);
+          });
+         
+          let updatedNode;
+          if(!equalState){
+            const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
+
             Object.keys(signalsToRun).forEach((sNum)=>{
               
-              if(rowProps[signalsToRun[sNum].fieldName]){
+              const signalConfig = signalsToRun[sNum];
+            
+              if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
                 this.#generateSignal(
-                  {
-                    ...signalsToRun[sNum],
+                  { 
+                    ...signalConfig,
                     ...{
                       "signalData":rowProps,
-                      "elementRoot":updatedNode.content, 
+                      "elementRoot":document.getElementById(""+id),
                       "signalId":sNum
                     }
                   }
                 );
-              }  
+              }
+
             });
-
-            const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
-            if(eventHandlers){
-                this.#setupClickEventListeners(
-                updatedNode.content.firstChild,
-                eventHandlers,
-                rowProps);
-            }
-
-            fragment.appendChild(updatedNode.content);
+            
             BaseDynamicComponent.prevState[templateName][id] = rowProps;
+          } 
         }
       }
-
-      if(replace){
-        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
-        content.querySelectorAll("[data-template-name]")[i].replaceChildren(fragment);
-      }
-    }
-    
+    } 
   }
  
   #setupClickEventListeners(rootNode,clickEventListeners,params) {
