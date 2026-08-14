@@ -106,7 +106,7 @@ const store = new Store(new CustomLoadAction(setData));
 
 const TableItem = () => {
 
-  TableItem.selected = (params)=>{
+  TableItem.getSelected = (params)=>{
     const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
     return result;
   };
@@ -114,11 +114,8 @@ const TableItem = () => {
   TableItem.label = (params)=>{
     return params.label;
   }
-
-  
-
-  
-  return`<tr {{id=id}} {{class=selected}}>
+ 
+  return`<tr {{id=id}} {{class=getSelected}}>
       <td class="col-md-1" {{textContent=id}}>Test</td>
         <td class="col-md-4">
           <a 
@@ -165,25 +162,14 @@ export class MainElement extends BaseDynamicComponent {
         store.select(e.target.parentNode.parentNode.id);
       }
       if(e.target.nodeName === "SPAN"){
-        console.log(e.target.parentNode.id);
         store.delete(e.target.parentNode.parentNode.parentNode.id);
       }
-      console.log(e.target.nodeName); 
-      /*
-       * TableItem.setupClickEventHandlers = {
-      "a": (params)=>{
-        //document.getElementById(params.id).className = "danger"; 
-        store.select(params.id)
-      },
-      "span": (params)=>store.delete(params.id)
-    }*/
-
+      
     });
  
   }
   
   render(data){
-    console.log(data);
     const html = `
         <div class="container">
             <div class="jumbotron">
