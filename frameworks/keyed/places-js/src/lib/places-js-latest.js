@@ -155,7 +155,7 @@ class BaseDynamicComponent extends HTMLElement {
     let signals = [];
     let dynamicSignals = [];
 
-    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = {};
+    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = [];
    
     BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupClickEventHandlers;
 
@@ -180,8 +180,11 @@ class BaseDynamicComponent extends HTMLElement {
      
       const templateFuncType = typeof templateFunc[fieldName];
       if(templateFuncType === 'function'){
-        BaseDynamicComponent.computedProps[templateName.toUpperCase()][fieldName] = templateFunc[fieldName];
-
+        BaseDynamicComponent.computedProps[templateName.toUpperCase()].push(
+          {
+            "field": fieldName,
+            "func": templateFunc[fieldName]
+          });
       }
      
       const signalData = {
@@ -397,11 +400,23 @@ class BaseDynamicComponent extends HTMLElement {
           .dataTemplateName
           .split("-")[2]
           .toUpperCase();  
-      const templateNode = BaseDynamicComponent.templates[templateName]; 
+      
       const state = data[this.#templateData[i].dataFieldName] || []; 
-      
+     
       const attrs = this.#templateData[i].attributes; 
-      
+      const attrData = [];
+      for(let j=0;j<attrs.length;j++){
+        if(attrs[j].name !== "data-array"){
+          if(attrs[j].value.startsWith("data")){
+            const itemKey = attrs[j].value.split('.')[1];
+            attrData.push({
+              "name":attrs[j].name,
+              "itemKey":itemKey
+            });
+          }
+        }
+      }
+
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
       const updatedOrdering = [];
@@ -430,34 +445,29 @@ class BaseDynamicComponent extends HTMLElement {
       if(added.size > 0){
 
         const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
-        let addFragment = null;
- 
+        //let addFragment = null;
+        let addFragment = []; 
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
          
           if(added.has(updateData)){
-          if(addFragment === null){
-              addFragment = document.createDocumentFragment();
+            if(addFragment === null){
+                addFragment = document.createDocumentFragment();
             }
            
             const itemState = state[num];        
             const rowProps = {...itemState}
-
-            Object.keys(BaseDynamicComponent.computedProps[templateName]).forEach((computedKey)=>{
-              rowProps[computedKey] = BaseDynamicComponent.computedProps[templateName][computedKey](rowProps);
+ 
+            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
+              rowProps[computedConfig.field] = computedConfig.func(rowProps);
             });
-            for(let j=0;j<attrs.length;j++){
-              if(attrs[j].name !== "data-array"){
-                if(attrs[j].value.startsWith("data")){
-                  const itemKey = attrs[j].value.split('.')[1];
-                  rowProps[attrs[j].name]= data[itemKey];
-                }
-              }
+            for(let j=0;j<attrData.length;j++){
+              rowProps[attrData[j].name] = data[attrData[j].itemKey];
             }
 
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
-            let addNode = templateNode.cloneNode(true);
+            let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
               
             signalsToRun.forEach((signal)=>{ 
                     
@@ -482,26 +492,31 @@ class BaseDynamicComponent extends HTMLElement {
                 eventHandlers,
                 rowProps);
             }
-
-            addFragment.appendChild(addNode.content);
+            addFragment.push(addNode.content);
+            //addFragment.appendChild(addNode.content);
           }else {
-            if(addFragment !== null){
-              const curNode = this.getRootNode().getElementById(""+updateData.id); 
+            if(addFragment.length > 0){
+              console.log(addFragment);
+              console.log(updateData);
+              const curNode = this.getRootNode().getElementById(""+updateData); 
               curNode.parent.insertBefore(addFragment,curNode); 
-              addFragment = null;
+
+              addFragment = [];
             }
           }
         }
       
-        if(addFragment !== null){
+        if(addFragment.length > 0){
 
           if(added.size < newIds.size - removed.size) { 
             const lastNode = this.getRootNode().getElementById(""+lastId);
-            lastNode.parentNode.appendChild(addFragment);
+            const add = document.createDocumentFragment();
+            add.replaceChildren(...addFragment);
+            lastNode.parentNode.appendChild(add);
           } else{
             this.getRootNode()
               .getElementById(this.#templateData[i].dataTemplateName)
-              .replaceChildren(addFragment);
+              .replaceChildren(...addFragment);
             hasReplaced = true; 
           }          
         }
@@ -585,14 +600,8 @@ class BaseDynamicComponent extends HTMLElement {
           const id = state[num].id;
           const itemState = state[num];        
           const rowProps = {...itemState}
-
-          for(let j=0;j<attrs.length;j++){
-            if(attrs[j].name !== "data-array"){
-              if(attrs[j].value.startsWith("data")){
-                const itemKey = attrs[j].value.split('.')[1];
-                rowProps[attrs[j].name]= data[itemKey];
-              }
-            }
+          for(let j=0;j<attrData.length;j++){
+            rowProps[attrData[j].name]= data[attrData[j].itemKey];
           }
           
           let equalState = true;
@@ -600,9 +609,9 @@ class BaseDynamicComponent extends HTMLElement {
           const prevProps = BaseDynamicComponent.prevState[templateName][""+id]          
           //Calculate computed values.
           const computed = BaseDynamicComponent.computedProps[templateName];
-          Object.keys(computed).forEach((computedKey)=>{
-            rowProps[computedKey] = computed[computedKey](rowProps);
-            equalState = equalState && rowProps[computedKey] === prevProps[computedKey];
+          BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
+            rowProps[computedConfig.field] = computedConfig.func(rowProps);
+            equalState = equalState && rowProps[computedConfig.field] === prevProps[computedConfig.field];
           });
           
           
