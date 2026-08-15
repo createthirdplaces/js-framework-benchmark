@@ -155,10 +155,10 @@ class BaseDynamicComponent extends HTMLElement {
     let signals = [];
     let dynamicSignals = [];
 
-    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = [];
-   
+    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = [];   
     BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupClickEventHandlers;
-
+ 
+    //firstTagEnd = -1;
     //TOOD: Optimize peformance. 
     const start = Date.now();
     let i = 0;
@@ -168,16 +168,18 @@ class BaseDynamicComponent extends HTMLElement {
         break;
       }
      
+      let firstTagEnd = templateStr.indexOf(">");
+      
       const endPos = templateStr.indexOf("}}");
       const signalStr = templateStr.substring(stateVarPos+2, endPos);
       const data = signalStr.split("=");
       const attr = data[0];
       const fieldName = data[1];
 
-      let newStr = "";
-      newStr+=`data-signal-id-${i}`;
-
-     
+      let newStr=`data-signal-id-${i}`;
+      if(endPos < firstTagEnd){
+        newStr = "";
+      }
       const templateFuncType = typeof templateFunc[fieldName];
       if(templateFuncType === 'function'){
         BaseDynamicComponent.computedProps[templateName.toUpperCase()].push(
@@ -191,21 +193,50 @@ class BaseDynamicComponent extends HTMLElement {
         fieldName,
         templateFuncType,
         attr,
-        "signalId":i
+        "signalId":newStr.length > 0 ? i : -1,
+        isOuter: endPos < firstTagEnd
       } 
 
-      templateStr = templateStr.substring(0,stateVarPos) +
-        newStr + templateStr.substring(endPos+2);
+      if(newStr.length > 0 ){
+        templateStr = templateStr.substring(0,stateVarPos) +
+          newStr + templateStr.substring(endPos+2);
+      } else {
+        templateStr = templateStr.substring(0,stateVarPos-1) +
+          newStr + templateStr.substring(endPos+2);
+      }
+
       signals.push(signalData);
       if(templateFuncType === 'function'){
         dynamicSignals.push(signalData);
       }
       i++;
+    } 
+    
+    const split = templateStr.split("\n");
+    for(let i=0;i<split.length;i++){
+      const tagStart = split[i].indexOf("<");
+      if(tagStart > 0 && split[i].charAt(tagStart -1) !== "/"){
+        split[i]=split[i].substring(tagStart);
+        console.log(split[i]);
+      }
+      const tagEnd = split[i].indexOf(">");
+      if(tagEnd > 0 && tagEnd < split[i].length - 1 && split[i].charAt(tagEnd-1) !== "/"){
+        console.log(tagEnd); 
+        console.log(split[i]); 
+        split[i]=split[i].substring(0,tagEnd+1);
+        console.log(split[i]);
+      }
+      split[i]=split[i].trim();
+      //Insert space for attributes
+      if(!split[i].endsWith(">")) {
+        split[i]=split[i]+" ";
+      }
     }
+    templateStr = split.join("");
 
+    console.log(templateStr);
     BaseDynamicComponent.templateSignals[templateName.toUpperCase()] = signals;
     BaseDynamicComponent.dynamicSignals[templateName.toUpperCase()] = dynamicSignals;
-
 
     template.innerHTML = templateStr;
 
@@ -249,17 +280,22 @@ class BaseDynamicComponent extends HTMLElement {
       fieldName,
       templateFuncType,
       signalId,
+      isOuter,
       attr} = params
     
-    let updated = signalData[fieldName]; 
-    
-    let element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-    //Set attribute on root node as the default case.
-    if(!element){
-      element=elementRoot;
+    let updated = signalData[fieldName];  
+    let element;
+
+    if(isOuter){
+      element = elementRoot;
     }
+    else {    
+      element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
+    }
+  
     if(updated === '') {
       element.removeAttribute(attr);
+      console.log("afds");
     }
     else {
       if(attr==="textContent"){
@@ -268,9 +304,7 @@ class BaseDynamicComponent extends HTMLElement {
         element.setAttribute(attr,`${updated}`);
       }
     }
-
   }
-
 
   addClickEventListeners(eventListeners){
     this.clickEventListeners = eventListeners;
@@ -355,7 +389,7 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
-    #renderTemplates(data,content) {
+  #renderTemplates(data,content) {
  
     if(!this.#templateData){
 
@@ -445,8 +479,7 @@ class BaseDynamicComponent extends HTMLElement {
       if(added.size > 0){
 
         const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
-        //let addFragment = null;
-        let addFragment = []; 
+        let addFragment = null; 
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
          
@@ -468,16 +501,16 @@ class BaseDynamicComponent extends HTMLElement {
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
             let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
-              
+            
             signalsToRun.forEach((signal)=>{ 
-                    
+             
               if(rowProps[signal.fieldName]){
                 this.#generateSignal(
                   {
                     ...signal,
                     ...{
                       "signalData":rowProps,
-                      "elementRoot":addNode.content,
+                      "elementRoot":addNode.content.firstChild,
                     }
                   }
                 );
@@ -492,32 +525,34 @@ class BaseDynamicComponent extends HTMLElement {
                 eventHandlers,
                 rowProps);
             }
-            addFragment.push(addNode.content);
-            //addFragment.appendChild(addNode.content);
+            addFragment.appendChild(addNode.content);
           }else {
-            if(addFragment.length > 0){
-              console.log(addFragment);
-              console.log(updateData);
+            if(addFragment !== null){
               const curNode = this.getRootNode().getElementById(""+updateData); 
-              curNode.parent.insertBefore(addFragment,curNode); 
-
-              addFragment = [];
+              requestAnimationFrame(()=>{ 
+                curNode.parent.insertBefore(addFragment,curNode); 
+              });
+              addFragment = null;
             }
           }
         }
       
-        if(addFragment.length > 0){
+        if(addFragment !== null){
 
           if(added.size < newIds.size - removed.size) { 
             const lastNode = this.getRootNode().getElementById(""+lastId);
             const add = document.createDocumentFragment();
-            add.replaceChildren(...addFragment);
-            lastNode.parentNode.appendChild(add);
+            add.replaceChildren(addFragment);
+            requestAnimationFrame(()=>{
+              lastNode.parentNode.appendChild(add);
+            });
           } else{
-            this.getRootNode()
-              .getElementById(this.#templateData[i].dataTemplateName)
-              .replaceChildren(...addFragment);
-            hasReplaced = true; 
+              requestAnimationFrame(()=>{
+                this.getRootNode()
+                  .getElementById(this.#templateData[i].dataTemplateName)
+                  .replaceChildren(addFragment);
+                hasReplaced = true;
+              });
           }          
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
@@ -613,8 +648,7 @@ class BaseDynamicComponent extends HTMLElement {
             rowProps[computedConfig.field] = computedConfig.func(rowProps);
             equalState = equalState && rowProps[computedConfig.field] === prevProps[computedConfig.field];
           });
-          
-          
+                
           let updatedNode;
           if(!equalState){
             const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
