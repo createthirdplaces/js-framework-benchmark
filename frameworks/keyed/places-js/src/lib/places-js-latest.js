@@ -143,7 +143,8 @@ class BaseDynamicComponent extends HTMLElement {
   static prevState = {}; 
   static prevOrdering = {};
   static eventHandlers = {};
- 
+
+  static templateFunctions = {};
   static templateCount = 0;
   templateIds = [];
 
@@ -217,14 +218,10 @@ class BaseDynamicComponent extends HTMLElement {
       const tagStart = split[i].indexOf("<");
       if(tagStart > 0 && split[i].charAt(tagStart -1) !== "/"){
         split[i]=split[i].substring(tagStart);
-        console.log(split[i]);
       }
       const tagEnd = split[i].indexOf(">");
       if(tagEnd > 0 && tagEnd < split[i].length - 1 && split[i].charAt(tagEnd-1) !== "/"){
-        console.log(tagEnd); 
-        console.log(split[i]); 
         split[i]=split[i].substring(0,tagEnd+1);
-        console.log(split[i]);
       }
       split[i]=split[i].trim();
       //Insert space for attributes
@@ -234,12 +231,13 @@ class BaseDynamicComponent extends HTMLElement {
     }
     templateStr = split.join("");
 
-    console.log(templateStr);
     BaseDynamicComponent.templateSignals[templateName.toUpperCase()] = signals;
     BaseDynamicComponent.dynamicSignals[templateName.toUpperCase()] = dynamicSignals;
 
     template.innerHTML = templateStr;
-
+    BaseDynamicComponent.templateFunctions[templateName] = templateFunc;
+    
+    
     BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
     BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
     BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]=[];
@@ -389,8 +387,40 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
+  #createClonedNodes(num,clone){
+    const section = [];
+    const template = document.createElement("template");
+    for(let i=0;i<100;i++){
+      section.push(clone.cloneNode(true));
+    }
+
+    template.replaceChildren(...section);
+
+    const createdNodes = [];
+    for(let i=0;i+1<num/100;i++){
+
+      const copy = template.cloneNode(true);
+      createdNodes.push(...copy.childNodes);
+    }
+
+    createdNodes.push(...section);
+    return createdNodes;
+  }
+
+  #create2(num, clone){
+    const section = [];
+    for(let i=0;i<num;i++){
+      section.push(clone.cloneNode(true));
+    }
+    console.log(clone);
+    return section;
+  }
+
   #renderTemplates(data,content) {
  
+    const templateIds = []; 
+
+    
     if(!this.#templateData){
 
       const templates = content.querySelectorAll("[data-template-name]");
@@ -404,6 +434,7 @@ class BaseDynamicComponent extends HTMLElement {
         const attrNames = templates[i].getAttributeNames();
         const dataFieldName = templates[i].getAttribute("data-array");
         const dataTemplateName = templates[i].getAttribute("data-template-name");
+
         for(let j=0;j<attrNames.length;j++){
           const attrName = attrNames[j]; 
           const attrValue = templates[i].getAttribute(attrName);
@@ -418,6 +449,11 @@ class BaseDynamicComponent extends HTMLElement {
        
         const templateId = `template-${BaseDynamicComponent.templateCount}-${dataTemplateName}`;
         templates[i].id = templateId; 
+        templateIds.push({
+          "id":templateId,
+          "templateName":dataTemplateName
+        });
+        
         this.#templateData.push({
           attributes:attrs,
           dataFieldName:dataFieldName,
@@ -450,6 +486,14 @@ class BaseDynamicComponent extends HTMLElement {
           }
         }
       }
+
+      const start = Date.now();
+      this.#createClonedNodes(50000,BaseDynamicComponent.templates[templateName]);
+      console.log(Date.now()-start);
+     
+      const start2 = Date.now();
+      this.#create2(50000,BaseDynamicComponent.templates[templateName]);
+      console.log(Date.now()-start2);
 
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
@@ -542,17 +586,18 @@ class BaseDynamicComponent extends HTMLElement {
           if(added.size < newIds.size - removed.size) { 
             const lastNode = this.getRootNode().getElementById(""+lastId);
             const add = document.createDocumentFragment();
-            add.replaceChildren(addFragment);
+            add.replaceChildren(addFragment); 
             requestAnimationFrame(()=>{
               lastNode.parentNode.appendChild(add);
             });
           } else{
-              requestAnimationFrame(()=>{
+            requestAnimationFrame(()=>{
                 this.getRootNode()
                   .getElementById(this.#templateData[i].dataTemplateName)
                   .replaceChildren(addFragment);
                 hasReplaced = true;
               });
+
           }          
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
@@ -673,7 +718,8 @@ class BaseDynamicComponent extends HTMLElement {
           } 
         }
       }
-    } 
+    }
+    return templateIds;
   }
  
   #setupClickEventListeners(rootNode,clickEventListeners,params) {
@@ -729,8 +775,17 @@ class BaseDynamicComponent extends HTMLElement {
       }
 
       this.innerHTML = "";
-      this.#renderTemplates(data,template.content);
+      const templateIds = this.#renderTemplates(data,template.content);
       this.innerHTML = template.innerHTML;
+
+      templateIds.forEach((templateId)=>{
+        
+        const func = BaseDynamicComponent.templateFunctions[templateId.templateName];
+        if(func.clickHandler){ 
+          this.getRootNode().getElementById(templateId.id)
+            .addEventListener("click",func.clickHandler,true);
+        }
+      });
 
       if(this.clickEventListeners){
         this.#setupClickEventListeners(this.getRootNode(),this.clickEventListeners);  
