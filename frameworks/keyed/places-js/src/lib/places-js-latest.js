@@ -240,7 +240,7 @@ class BaseDynamicComponent extends HTMLElement {
     BaseDynamicComponent.templateFunctions[templateName] = templateFunc;
     
     
-    BaseDynamicComponent.templates[templateName.toUpperCase()] = template;
+    BaseDynamicComponent.templates[templateName.toUpperCase()] = template.content.firstChild;
     BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
     BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]=[];
   }
@@ -510,7 +510,7 @@ class BaseDynamicComponent extends HTMLElement {
 
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
-            let addNode = BaseDynamicComponent.templates[templateName].content.firstChild.cloneNode(true);
+            let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
             signalsToRun.forEach((signal)=>{ 
              
               if(rowProps[signal.fieldName]){
