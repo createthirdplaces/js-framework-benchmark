@@ -572,12 +572,10 @@ class BaseDynamicComponent extends HTMLElement {
         
         if(removed.size === prevIds.size && !hasReplaced){
 
-          requestAnimationFrame(()=>{
             this.getRootNode()
                 .getElementById(this.#templateData[i].dataTemplateName)
                 .replaceChildren([]);
             BaseDynamicComponent.prevState[templateName] = {};
-          }
           break; 
         }
 
@@ -634,7 +632,7 @@ class BaseDynamicComponent extends HTMLElement {
                 nodeToMove.parentNode.appendChild(nodeToMove);
               }
             }
-          }
+          });
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
       }
