@@ -106,6 +106,15 @@ const store = new Store(new CustomLoadAction(setData));
 
 const TableItem = () => {
 
+  TableItem.clickHandler = (e)=>{
+    if(e.target.nodeName === "A"){
+      store.select(e.target.parentNode.parentNode.id);
+    }
+    if(e.target.nodeName === "SPAN"){
+      store.delete(e.target.parentNode.parentNode.parentNode.id);
+    } 
+  };
+
   TableItem.getSelected = (params)=>{
     const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
     return result;
@@ -116,25 +125,22 @@ const TableItem = () => {
   }
  
   return`<tr {{id=id}} {{class=getSelected}}>
-      <td class="col-md-1" {{textContent=id}}></td>
+      <td class="col-md-1" {{textContent=id}}/>
         <td class="col-md-4">
-          <a 
-            {{textContent=label}}
-            >
-            </a>
+          <a {{textContent=label}}/>
         </td>
         <td class="col-md-1">
           <a>
             <span
               class="glyphicon glyphicon-remove" 
               aria-hidden="true"
-            >
-            </span>
+            />
           </a>
         </td>
-       <td class="col-md-6"></td>
+       <td class="col-md-6"/>
     </tr>`;
 }
+
 BaseDynamicComponent.defineTemplate(TableItem,"TableItem");
 
 export class MainElement extends BaseDynamicComponent {
@@ -155,18 +161,6 @@ export class MainElement extends BaseDynamicComponent {
       "#clear":()=>store.clear(),
       "#swaprows":()=>store.swapRows()
     });
-
-    this.addEventListener("click",(e)=>{
-
-      if(e.target.nodeName === "A"){
-        store.select(e.target.parentNode.parentNode.id);
-      }
-      if(e.target.nodeName === "SPAN"){
-        store.delete(e.target.parentNode.parentNode.parentNode.id);
-      }
-      
-    });
- 
   }
   
   render(data){
