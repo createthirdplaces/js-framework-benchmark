@@ -295,7 +295,6 @@ class BaseDynamicComponent extends HTMLElement {
   
     if(updated === '') {
       element.removeAttribute(attr);
-      console.log("afds");
     }
     else {
       if(attr==="textContent"){
@@ -572,10 +571,13 @@ class BaseDynamicComponent extends HTMLElement {
       if(removed.size > 0) {
         
         if(removed.size === prevIds.size && !hasReplaced){
-          this.getRootNode()
-              .getElementById(this.#templateData[i].dataTemplateName)
-              .replaceChildren([]);
-          BaseDynamicComponent.prevState[templateName] = {};
+
+          requestAnimationFrame(()=>{
+            this.getRootNode()
+                .getElementById(this.#templateData[i].dataTemplateName)
+                .replaceChildren([]);
+            BaseDynamicComponent.prevState[templateName] = {};
+          }
           break; 
         }
 
@@ -617,17 +619,20 @@ class BaseDynamicComponent extends HTMLElement {
         }
         
         if(moveNodes.length > 0){
-          for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
-           
-            const moveData = moveNodes[mNum];
 
-            const nodeToMove = this.getRootNode().getElementById(
-              moveData.moveId);
-          
-            if(moveData.prevNode !== null){
-              moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
-            } else {
-              nodeToMove.parentNode.appendChild(nodeToMove);
+          requestAnimationFrame(()=>{
+            for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
+             
+              const moveData = moveNodes[mNum];
+
+              const nodeToMove = this.getRootNode().getElementById(
+                moveData.moveId);
+            
+              if(moveData.prevNode !== null){
+                moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
+              } else {
+                nodeToMove.parentNode.appendChild(nodeToMove);
+              }
             }
           }
         }
@@ -640,48 +645,51 @@ class BaseDynamicComponent extends HTMLElement {
 
       //Only should run for changes
       if(sameNumber){
-        for(let num=0;num<state.length;num++){
-       
-          const id = state[num].id;
-          const itemState = state[num];        
-          const rowProps = {...itemState}
-          for(let j=0;j<attrData.length;j++){
-            rowProps[attrData[j].name]= data[attrData[j].itemKey];
-          }
-          
-          let equalState = true;
-        
-          const prevProps = BaseDynamicComponent.prevState[templateName][""+id]          
-          //Calculate computed values.
-          const computed = BaseDynamicComponent.computedProps[templateName];
-          BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
-            rowProps[computedConfig.field] = computedConfig.func(rowProps);
-            equalState = equalState && rowProps[computedConfig.field] === prevProps[computedConfig.field];
-          });
-                
-          let updatedNode;
-          if(!equalState){
-            const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
 
-            signalsToRun.forEach((signalConfig)=>{
-              
-              if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
-                this.#generateSignal(
-                  { 
-                    ...signalConfig,
-                    ...{
-                      "signalData":rowProps,
-                      "elementRoot": document.getElementById(""+id),
-                    }
-                  }
-                );
-              }
-
-            });
+        requestAnimationFrame(()=>{
+          for(let num=0;num<state.length;num++){
+         
+            const id = state[num].id;
+            const itemState = state[num];        
+            const rowProps = {...itemState}
+            for(let j=0;j<attrData.length;j++){
+              rowProps[attrData[j].name]= data[attrData[j].itemKey];
+            }
             
-            BaseDynamicComponent.prevState[templateName][id] = rowProps;
-          } 
-        }
+            let equalState = true;
+          
+            const prevProps = BaseDynamicComponent.prevState[templateName][""+id]          
+            //Calculate computed values.
+            const computed = BaseDynamicComponent.computedProps[templateName];
+            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
+              rowProps[computedConfig.field] = computedConfig.func(rowProps);
+              equalState = equalState && rowProps[computedConfig.field] === prevProps[computedConfig.field];
+            });
+                  
+            let updatedNode;
+            if(!equalState){
+              const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
+
+              signalsToRun.forEach((signalConfig)=>{
+                
+                if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
+                  this.#generateSignal(
+                    { 
+                      ...signalConfig,
+                      ...{
+                        "signalData":rowProps,
+                        "elementRoot": document.getElementById(""+id),
+                      }
+                    }
+                  );
+                }
+
+              });
+              
+              BaseDynamicComponent.prevState[templateName][id] = rowProps;
+            } 
+          }
+        });
       }
     }
   }
