@@ -120,6 +120,8 @@ class ApiLoadAction{
   }
 }
 
+
+
 class BaseDynamicComponent extends HTMLElement {
 
   #attachedEventsToShadowRoot = false;
@@ -386,50 +388,20 @@ class BaseDynamicComponent extends HTMLElement {
       );
     }
   }
-
-  #createClonedNodes(num,clone){
-    const section = [];
-    const template = document.createElement("template");
-    for(let i=0;i<100;i++){
-      section.push(clone.cloneNode(true));
-    }
-
-    template.replaceChildren(...section);
-
-    const createdNodes = [];
-    for(let i=0;i+1<num/100;i++){
-
-      const copy = template.cloneNode(true);
-      createdNodes.push(...copy.childNodes);
-    }
-
-    createdNodes.push(...section);
-    return createdNodes;
-  }
-
-  #create2(num, clone){
-    const section = [];
-    for(let i=0;i<num;i++){
-      section.push(clone.cloneNode(true));
-    }
-    console.log(clone);
-    return section;
-  }
-
+ 
   #renderTemplates(data,content) {
  
-    const templateIds = []; 
-
+    this.#renderTemplates.templateIds = []; 
     
     if(!this.#templateData){
 
       const templates = content.querySelectorAll("[data-template-name]");
-      if(templates.length >= 0){
-        this.#templateLoaded = true;
-      }
-
-      this.#templateData = [] 
+      
       for(let i=0;i<templates.length;i++){
+
+        if(!this.#templateData){
+          this.#templateData = [];
+        }
         let attrs = [];
         const attrNames = templates[i].getAttributeNames();
         const dataFieldName = templates[i].getAttribute("data-array");
@@ -447,20 +419,21 @@ class BaseDynamicComponent extends HTMLElement {
           });
         }   
        
-        const templateId = `template-${BaseDynamicComponent.templateCount}-${dataTemplateName}`;
-        templates[i].id = templateId; 
-        templateIds.push({
-          "id":templateId,
+        templates[i].id = `template-${BaseDynamicComponent.templateCount}-${dataTemplateName}`;
+ 
+        this.#renderTemplates.templateIds.push({
+          "id":templates[i].id,
           "templateName":dataTemplateName
         });
         
         this.#templateData.push({
           attributes:attrs,
           dataFieldName:dataFieldName,
-          dataTemplateName: templateId
+          dataTemplateName: templates[i].id
         });
         BaseDynamicComponent.templateCount++;
       } 
+      this.#templateLoaded = true;
     }
     
     for(let i = 0; i < this.#templateData.length;i++){
@@ -487,13 +460,6 @@ class BaseDynamicComponent extends HTMLElement {
         }
       }
 
-      const start = Date.now();
-      this.#createClonedNodes(50000,BaseDynamicComponent.templates[templateName]);
-      console.log(Date.now()-start);
-     
-      const start2 = Date.now();
-      this.#create2(50000,BaseDynamicComponent.templates[templateName]);
-      console.log(Date.now()-start2);
 
       const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
     
@@ -544,8 +510,7 @@ class BaseDynamicComponent extends HTMLElement {
 
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
-            let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
-            
+            let addNode = BaseDynamicComponent.templates[templateName].content.firstChild.cloneNode(true);
             signalsToRun.forEach((signal)=>{ 
              
               if(rowProps[signal.fieldName]){
@@ -554,7 +519,7 @@ class BaseDynamicComponent extends HTMLElement {
                     ...signal,
                     ...{
                       "signalData":rowProps,
-                      "elementRoot":addNode.content.firstChild,
+                      "elementRoot":addNode,
                     }
                   }
                 );
@@ -565,11 +530,11 @@ class BaseDynamicComponent extends HTMLElement {
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
               this.#setupClickEventListeners(
-                addNode.content.firstChild,
+                addNode,
                 eventHandlers,
                 rowProps);
             }
-            addFragment.appendChild(addNode.content);
+            addFragment.appendChild(addNode);
           }else {
             if(addFragment !== null){
               const curNode = this.getRootNode().getElementById(""+updateData); 
@@ -719,7 +684,6 @@ class BaseDynamicComponent extends HTMLElement {
         }
       }
     }
-    return templateIds;
   }
  
   #setupClickEventListeners(rootNode,clickEventListeners,params) {
@@ -775,10 +739,10 @@ class BaseDynamicComponent extends HTMLElement {
       }
 
       this.innerHTML = "";
-      const templateIds = this.#renderTemplates(data,template.content);
+      this.#renderTemplates(data,template.content);
       this.innerHTML = template.innerHTML;
 
-      templateIds.forEach((templateId)=>{
+      this.#renderTemplates.templateIds.forEach((templateId)=>{
         
         const func = BaseDynamicComponent.templateFunctions[templateId.templateName];
         if(func.clickHandler){ 
@@ -822,6 +786,16 @@ class CustomLoadAction {
   }
 }
 
+const updateProxy = {
+  set(target,prop,value,receiver){
+   
+    console.log("Proxy trigger");
+    target[property]=value;
+    return true;
+  }
+
+}
+
 class DataStore {
 
   static #storeCount = 0;
@@ -862,6 +836,9 @@ class DataStore {
    */
   updateStoreData(storeUpdates){
     this.#storeData = {...this.#storeData,...storeUpdates};
+    /*Object.keys(this.#storeData).forEach((key)=>{
+     console.log(storeUpdates); 
+    });*/
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
       this.#componentSubscriptions[i].updateFromSubscribedStores();
     }

@@ -38,7 +38,6 @@ class Store extends DataStore {
     run() {
         this.updateStoreData({
           data:this.buildData(),
-          selected: undefined
         });
     }
     
