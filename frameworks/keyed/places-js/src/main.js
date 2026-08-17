@@ -106,6 +106,7 @@ const store = new Store(new CustomLoadAction(setData));
 const TableItem = () => {
 
   TableItem.clickHandler = (e)=>{
+		e.stopPropagation();
     if(e.target.nodeName === "A"){
       store.select(e.target.parentNode.parentNode.id);
     }
@@ -114,8 +115,8 @@ const TableItem = () => {
     } 
   };
 
-  TableItem.getSelected = (params)=>{
-    const result = parseInt(params.selected)===parseInt(params.id) ? 'danger':''
+  TableItem.getSelected = (params,shared)=>{
+    const result = parseInt(shared.selected)===parseInt(params.id) ? 'danger':''
     return result;
   };
 
