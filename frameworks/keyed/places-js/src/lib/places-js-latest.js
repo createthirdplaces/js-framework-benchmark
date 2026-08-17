@@ -194,7 +194,6 @@ class BaseDynamicComponent extends HTMLElement {
      
       const signalData = {
         fieldName,
-        templateFuncType,
         attr,
         "signalId":newStr.length > 0 ? i : -1,
         isOuter: endPos < firstTagEnd
@@ -278,7 +277,6 @@ class BaseDynamicComponent extends HTMLElement {
       signalData,
       elementRoot,
       fieldName,
-      templateFuncType,
       signalId,
       isOuter,
       attr} = params
@@ -389,7 +387,7 @@ class BaseDynamicComponent extends HTMLElement {
   }
  
   #renderTemplates(data,content) {
- 
+
     this.#renderTemplates.templateIds = []; 
     
     if(!this.#templateData){
@@ -488,7 +486,13 @@ class BaseDynamicComponent extends HTMLElement {
       if(added.size > 0){
 
         const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
-        let addFragment = null; 
+        
+				const sharedData = {};
+				for(let j=0;j<attrData.length;j++){
+					sharedData[attrData[j].name]= data[attrData[j].itemKey];
+				}
+
+				let addFragment = null; 
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
          
@@ -498,34 +502,31 @@ class BaseDynamicComponent extends HTMLElement {
             }
            
             const itemState = state[num];        
-            const rowProps = {...itemState}
- 
-            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
-              rowProps[computedConfig.field] = computedConfig.func(rowProps);
-            });
-            for(let j=0;j<attrData.length;j++){
-              rowProps[attrData[j].name] = data[attrData[j].itemKey];
-            }
 
+						const computedProps = {}; 
+            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
+              computedProps[computedConfig.field] = computedConfig.func(itemState,sharedData);
+            });
+            
             const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
 
             let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
-            signalsToRun.forEach((signal)=>{ 
+						const signalData =  {...computedProps,...itemState}
+
+						signalsToRun.forEach((signal)=>{ 
              
-              if(rowProps[signal.fieldName]){
                 this.#generateSignal(
                   {
                     ...signal,
                     ...{
-                      "signalData":rowProps,
+                      "signalData":signalData,
                       "elementRoot":addNode,
                     }
                   }
                 );
-              }
             })
            
-            BaseDynamicComponent.prevState[templateName][updateData] = rowProps;
+            BaseDynamicComponent.prevState[templateName][updateData] = computedProps;
             const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
             if(eventHandlers){
               this.#setupClickEventListeners(
@@ -537,9 +538,9 @@ class BaseDynamicComponent extends HTMLElement {
           }else {
             if(addFragment !== null){
               const curNode = this.getRootNode().getElementById(""+updateData); 
-              requestAnimationFrame(()=>{ 
+              //requestAnimationFrame(()=>{ 
                 curNode.parent.insertBefore(addFragment,curNode); 
-              });
+              //});
               addFragment = null;
             }
           }
@@ -555,13 +556,12 @@ class BaseDynamicComponent extends HTMLElement {
               lastNode.parentNode.appendChild(add);
             });
           } else{
-            requestAnimationFrame(()=>{
-                this.getRootNode()
-                  .getElementById(this.#templateData[i].dataTemplateName)
-                  .replaceChildren(addFragment);
-                hasReplaced = true;
-              });
-
+            //requestAnimationFrame(()=>{
+							this.getRootNode()
+								.getElementById(this.#templateData[i].dataTemplateName)
+								.replaceChildren(addFragment);
+							hasReplaced = true;
+						//});
           }          
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
@@ -641,53 +641,49 @@ class BaseDynamicComponent extends HTMLElement {
         break;
       }
 
-      //Only should run for changes
       if(sameNumber){
-
         requestAnimationFrame(()=>{
-          for(let num=0;num<state.length;num++){
+      	
+					const sharedData = {};
+					for(let j=0;j<attrData.length;j++){
+						sharedData[attrData[j].name]= data[attrData[j].itemKey];
+					}
+
+					for(let num=0;num<state.length;num++){
          
             const id = state[num].id;
             const itemState = state[num];        
-            const rowProps = {...itemState}
-            for(let j=0;j<attrData.length;j++){
-              rowProps[attrData[j].name]= data[attrData[j].itemKey];
-            }
-            
-            let equalState = true;
-          
-            const prevProps = BaseDynamicComponent.prevState[templateName][""+id]          
-            //Calculate computed values.
-            const computed = BaseDynamicComponent.computedProps[templateName];
+           
+            const prevProps = BaseDynamicComponent.prevState[templateName][""+id]                   
+						const computedPropValues = {}; 
+						//Calculate computed values.
             BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
-              rowProps[computedConfig.field] = computedConfig.func(rowProps);
-              equalState = equalState && rowProps[computedConfig.field] === prevProps[computedConfig.field];
+              computedPropValues[computedConfig.field] = computedConfig.func(itemState, sharedData);
             });
+
                   
             let updatedNode;
-            if(!equalState){
-              const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
+            const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
+						signalsToRun.forEach((signalConfig)=>{
+							if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
+							
+								this.#generateSignal(
+									{ 
+										...signalConfig,
+										...{
+											"signalData":computedPropValues,
+											"elementRoot": document.getElementById(""+id),
+										}
+									}
+								);
+							}
 
-              signalsToRun.forEach((signalConfig)=>{
-                
-                if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== rowProps[signalConfig.fieldName]){
-                  this.#generateSignal(
-                    { 
-                      ...signalConfig,
-                      ...{
-                        "signalData":rowProps,
-                        "elementRoot": document.getElementById(""+id),
-                      }
-                    }
-                  );
-                }
-
-              });
-              
-              BaseDynamicComponent.prevState[templateName][id] = rowProps;
-            } 
+						});
+						
+						BaseDynamicComponent.prevState[templateName][id] = computedPropValues;
           }
-        });
+
+      });
       }
     }
   }
@@ -712,7 +708,6 @@ class BaseDynamicComponent extends HTMLElement {
 
   #generateAndSaveHTML(data) {
 
-    //let start = Date.now();
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
@@ -751,9 +746,9 @@ class BaseDynamicComponent extends HTMLElement {
       this.#renderTemplates.templateIds.forEach((templateId)=>{
         
         const func = BaseDynamicComponent.templateFunctions[templateId.templateName];
-        if(func.clickHandler){ 
+				if(func.clickHandler){ 
           this.getRootNode().getElementById(templateId.id)
-            .addEventListener("click",func.clickHandler,true);
+            .addEventListener("click",func.clickHandler);
         }
       });
 
@@ -792,15 +787,6 @@ class CustomLoadAction {
   }
 }
 
-const updateProxy = {
-  set(target,prop,value,receiver){
-   
-    console.log("Proxy trigger");
-    target[property]=value;
-    return true;
-  }
-
-}
 
 class DataStore {
 
@@ -842,9 +828,6 @@ class DataStore {
    */
   updateStoreData(storeUpdates){
     this.#storeData = {...this.#storeData,...storeUpdates};
-    /*Object.keys(this.#storeData).forEach((key)=>{
-     console.log(storeUpdates); 
-    });*/
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
       this.#componentSubscriptions[i].updateFromSubscribedStores();
     }
