@@ -41,8 +41,7 @@ class ApiLoadAction{
   }
 
   static async #getErrorData(response, url) {
-
-    let message;
+onfig:signal;
 
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -273,13 +272,16 @@ class BaseDynamicComponent extends HTMLElement {
 
  #generateSignal(params){
 
-    const{ 
+		const {
+			fieldName,
+			attr,
+			isOuter,
+			signalId } = params.signalConfig
+    
+		const{ 
       signalData,
-      elementRoot,
-      fieldName,
-      signalId,
-      isOuter,
-      attr} = params
+      elementRoot
+		} = params.updateData;
     
     let updated = signalData[fieldName];  
     let element;
@@ -517,8 +519,8 @@ class BaseDynamicComponent extends HTMLElement {
              
                 this.#generateSignal(
                   {
-                    ...signal,
-                    ...{
+                    signalConfig:signal,
+                    updateData:{
                       "signalData":signalData,
                       "elementRoot":addNode,
                     }
@@ -556,12 +558,12 @@ class BaseDynamicComponent extends HTMLElement {
               lastNode.parentNode.appendChild(add);
             });
           } else{
-            //requestAnimationFrame(()=>{
+            requestAnimationFrame(()=>{
 							this.getRootNode()
 								.getElementById(this.#templateData[i].dataTemplateName)
 								.replaceChildren(addFragment);
 							hasReplaced = true;
-						//});
+						});
           }          
         }
         BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
@@ -642,7 +644,8 @@ class BaseDynamicComponent extends HTMLElement {
       }
 
       if(sameNumber){
-        requestAnimationFrame(()=>{
+				let start = Date.now();
+        //requestAnimationFrame(()=>{
       	
 					const sharedData = {};
 					for(let j=0;j<attrData.length;j++){
@@ -669,8 +672,8 @@ class BaseDynamicComponent extends HTMLElement {
 							
 								this.#generateSignal(
 									{ 
-										...signalConfig,
-										...{
+										signalConfig: signalConfig,
+										updateData: {
 											"signalData":computedPropValues,
 											"elementRoot": document.getElementById(""+id),
 										}
@@ -682,8 +685,8 @@ class BaseDynamicComponent extends HTMLElement {
 						
 						BaseDynamicComponent.prevState[templateName][id] = computedPropValues;
           }
-
-      });
+					console.log(Date.now()-start);
+				//});
       }
     }
   }
@@ -698,8 +701,9 @@ class BaseDynamicComponent extends HTMLElement {
         }
         else {  
           element.onclick = (e)=>{
-            e.preventDefault();
-            clickEventListeners[selector](params);
+						requestAnimationFrame(()=>{
+							clickEventListeners[selector](params);
+						});
           };
         }
       });
