@@ -1,4 +1,4 @@
-import {BaseDynamicComponent,CustomLoadAction,DataStore} from "./lib/places-js-latest.js";
+import {ContainerComponent,CustomLoadAction,DataStore,PresentationComponent} from "./lib/places-js-latest.js";
 
 function _random(max) {
   return Math.round(Math.random()*1000)%max;
@@ -103,31 +103,40 @@ const setData = function() {
 
 const store = new Store(new CustomLoadAction(setData));
 
-const TableItem = () => {
+class TableItem extends PresentationComponent {
 
-  TableItem.clickHandler = (e)=>{
-		e.stopPropagation();
-    if(e.target.nodeName === "A"){
-      store.select(e.target.parentNode.parentNode.id);
-    }
-    if(e.target.nodeName === "SPAN"){
-      store.delete(e.target.parentNode.parentNode.parentNode.id);
+  clickHandlers() {
+    return {
+      "select": ({e})=>{
+          store.select(e.target.parentNode.parentNode.id);
+      },
+      "delete":({e})=>{ 
+        store.delete(e.target.parentNode.parentNode.parentNode.id);
+      }
     } 
-  };
-
-  TableItem.getSelected = (params,shared)=>{
-    const result = parseInt(shared.selected)===parseInt(params.id) ? 'danger':''
-    return result;
-  };
-
-  TableItem.label = (params)=>{
-    return params.label;
   }
- 
-  return`<tr {{id=id}} {{class=getSelected}}>
-      <td class="col-md-1" {{textContent=id}}/>
+  
+  defineComputedState() {
+    return { 
+      "label": (state)=>{
+        return state.label;
+      },
+      "selected": (state)=>{
+        return state.id === state.selected ? 'danger' : '';
+      }
+    }
+  }
+  
+  defineTemplate(){ 
+    return `
+      <tr id={{id}} class={{selected}}>
+        <td class="col-md-1">
+          {{id}}
+        </td>
         <td class="col-md-4">
-          <a {{textContent=label}}/>
+          <a>
+            {{label}}
+          </a>
         </td>
         <td class="col-md-1">
           <a>
@@ -139,11 +148,10 @@ const TableItem = () => {
         </td>
        <td class="col-md-6"/>
     </tr>`;
+  }
 }
 
-BaseDynamicComponent.defineTemplate(TableItem,"TableItem");
-
-export class MainElement extends BaseDynamicComponent {
+export class MainElement extends ContainerComponent {
   constructor(){
     super([{
         dataStore:store
@@ -154,13 +162,18 @@ export class MainElement extends BaseDynamicComponent {
     const self = this;
 
     this.addClickEventListeners({
-      "#add": ()=>store.add(),
-      "#run": ()=>store.run(),
+      "#add": ()=>{
+        store.add()
+      },
+      "#run": ()=>{
+        store.run()
+      },
       "#update":()=>store.update(),
       "#runlots":()=>store.runLots(),
       "#clear":()=>store.clear(),
       "#swaprows":()=>store.swapRows()
     });
+    PresentationComponent.init(TableItem);
   }
   
   render(data){
@@ -195,10 +208,11 @@ export class MainElement extends BaseDynamicComponent {
                     </div>
                 </div>
             </div>
-            <table class="table table-hover table-striped test-data">
+            <table class="table table-hover table-striped test-data" style="table-layout:fixed">
                 <tbody
-                    data-array=data
-                    data-template-name=TableItem
+                    data-component=TableItem
+                    data-repeat
+                    data-state=data
                     selected=data.selected
                 ></tbody>
             </table>
