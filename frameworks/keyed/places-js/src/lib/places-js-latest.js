@@ -298,7 +298,6 @@ class PresentationComponent {
     }
     templateStr = linesToAdd.join("");
 
-    console.log(templateStr);
     template.innerHTML = templateStr;
     
     this.templateNode = template.content.firstChild;
@@ -374,6 +373,7 @@ class ContainerComponent extends HTMLElement {
  
   #changeEventListeners;
   #clickEventListeners;
+  #clickEventListenersAdded = false;
 
   #templateData = null;
   #templateContainers = null;
@@ -626,8 +626,7 @@ class ContainerComponent extends HTMLElement {
       document.getElementById(presentationItem.id).replaceChildren(elementRoot);
     }
    
-    presentationItem.prevState = computedPropValues;
-    
+    presentationItem.prevState = computedPropValues; 
   }
 
   #setupEventListeners(
@@ -651,7 +650,6 @@ class ContainerComponent extends HTMLElement {
         templateFunctions = presentationComponent[defineName]();
       }
     }
-   
     
     if(events && events.length > 0){
       for(let i=0;i<events.length;i++){
@@ -661,13 +659,16 @@ class ContainerComponent extends HTMLElement {
         
         elem.removeAttribute(oldEventName);
 
-        const newAttr = `data-${eventType}-id`;
-       
+        const newAttr = `data-${eventType}-id`;     
         const countVar = `${eventType}HandlerCount`;
-        elem.setAttribute(newAttr,ContainerComponent[countVar]);
+       
+        
+        const eventHandlerId = ContainerComponent[countVar];
+        elem.setAttribute(newAttr,eventHandlerId);
       
         const handlerFieldName = `${eventType}TemplateItemHandlers`;
-        ContainerComponent[handlerFieldName][i] = {
+        ContainerComponent[handlerFieldName][eventHandlerId] = {
+          "presentationId":addNode.id ?? "",
           "stateSlice":stateSlice,
           "templateFunction":templateFunctions[events[i]],
         }
@@ -774,7 +775,6 @@ class ContainerComponent extends HTMLElement {
     
       //template is a single item.
       if(!isArray){ 
-        console.log("Is single template item");
         this.#updateSingleItemTemplate(this.#presentationItems[i], data);  
         continue;
       }
@@ -847,14 +847,13 @@ class ContainerComponent extends HTMLElement {
 							);
             })
 						
-						addNode.id = signalData.id;
-           
+						addNode.id = signalData.id;           
             presentationItem.prevState[updateData] = computedProps;
-
+ 
             const stateSlice = (state) =>{
-              return state[this.#templateData[i].dataFieldName][num]
+              return computedProps;
             }
-            
+           
             this.#setupTemplateEventListeners(
               addNode,
               stateSlice,
@@ -970,8 +969,8 @@ class ContainerComponent extends HTMLElement {
            
             const prevProps = presentationItem.prevState[""+id]                   
 						const computedPropValues = {}; 
-						//Calculate computed values.
-           
+						
+            //Calculate computed values.
             const componentConfig = PresentationComponent
               .presentationComponents[presentationItem.templateName]
 
@@ -999,7 +998,7 @@ class ContainerComponent extends HTMLElement {
 
 						});
 						
-						presentationItem.prevState[id] = computedPropValues;
+				  presentationItem.prevState[id] = computedPropValues;
         }
       }	
     }
@@ -1079,30 +1078,70 @@ class ContainerComponent extends HTMLElement {
                       || e.target.parentNode.getAttribute("data-click-id") 
                       || e.target.parentNode.parentNode.getAttribute("data-click-id") 
 
-
               if(id !== null) {
 
                 e.preventDefault(); 
-                ContainerComponent.clickTemplateItemHandlers[id].templateFunction({
+                const handlerConfig = ContainerComponent.clickTemplateItemHandlers[id]
+
+                handlerConfig.templateFunction({
                   "event":e,
-                  "componentAttrs":this.attributes,
+                  "containerAttrs":this.attributes,
+                  "componentId": handlerConfig.presentationId,
                   "state":ContainerComponent.clickTemplateItemHandlers[id].stateSlice(this.componentStore) 
                 })
               }
           });
         }
           
-      });
-      this.setupClickEventListeners();  
-      this.setupChangeEventListeners();
+    });
   }
-	
-  #generateAndSaveHTML(data) {
 
+  #setupClickListenerMapping(html){
+
+    const split = html.split("onClick={{");
+    for(let i=1; i<split.length; i++){
+      const sectionSplit = split[i].split("}}");
+      const handlerName = sectionSplit[0];
+      split[i]=`data-${this.nodeName}-click="${handlerName}"${sectionSplit[1]}`;
+    }
+   
+    return split.join("");
+  }
+
+  #addContainerClickListeners(){
+
+    if(this.#clickEventListenersAdded){
+      return;
+    }
+   
+    const handlerMap = {};
+    const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
+
+    this.getRootNode()
+      .querySelectorAll(`[${clickSelectorName}]`)
+      .forEach((node)=>{
+        
+        const eventHandlerName = node.attributes[clickSelectorName].value;
+        handlerMap[eventHandlerName] = this.#clickEventListeners[eventHandlerName];
+    });
+
+    this.addEventListener("click",(e)=>{
+
+      const attrs = e.target?.attributes
+
+        if(attrs && attrs[clickSelectorName]){
+          const handlerName = e.target.attributes[clickSelectorName].value;
+          handlerMap[handlerName](e);
+        }
+    });
+    
+    this.#clickEventListenersAdded = true;
+  }
+  
+  #generateAndSaveHTML(data) {
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
-      //const template = document.createElement("template");
       if(this.#loadingStarted > 0){
 
         const current = Date.now();
@@ -1117,19 +1156,26 @@ class ContainerComponent extends HTMLElement {
 
           const self = this;
           if(remainingTime > 0){
-            setTimeout(()=>{
-              //template.innerHTML = this.render(data);
-							this.innerHTML = this.render(data);
+            setTimeout(()=>{ 
+              const html = this.render(data);
+							this.innerHTML = this.#setupClickListenerMapping(html);
+              this.#addContainerClickListeners();
             },remainingTime);
           } else {
-            this.innerHTML = this.render(data);
+            const html = this.render(data);
+            this.innerHTML = this.#setupClickListenerMapping(html);
+            this.#addContainerClickListeners();
           }
         } else {
-          this.innerHTML = this.render(data);
+          const html = this.render(data);
+          this.innerHTML = this.#setupClickListenerMapping(html);
+          this.#addContainerClickListeners();
         }
       }
       else {
-        this.innerHTML = this.render(data);
+        const html = this.render(data);
+        this.innerHTML = this.#setupClickListenerMapping(html);
+        this.#addContainerClickListeners();
       }
 
       this.#initPresentationComponents(data);

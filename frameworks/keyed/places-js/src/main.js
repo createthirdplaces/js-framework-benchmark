@@ -107,11 +107,12 @@ class TableItem extends PresentationComponent {
 
   clickHandlers() {
     return {
-      "select": ({e})=>{
-          store.select(e.target.parentNode.parentNode.id);
+      "select": ({componentId})=>{
+        console.log("Selecting:"+componentId);
+        store.select(componentId);
       },
-      "delete":({e})=>{ 
-        store.delete(e.target.parentNode.parentNode.parentNode.id);
+      "delete":({componentId})=>{
+        store.delete(componentId);
       }
     } 
   }
@@ -122,6 +123,8 @@ class TableItem extends PresentationComponent {
         return state.label;
       },
       "selected": (state)=>{
+        console.log("Reselecting");
+        console.log(state);
         return state.id === state.selected ? 'danger' : '';
       }
     }
@@ -134,15 +137,16 @@ class TableItem extends PresentationComponent {
           {{id}}
         </td>
         <td class="col-md-4">
-          <a>
+          <a onClick={{select}}>
             {{label}}
           </a>
         </td>
         <td class="col-md-1">
           <a>
             <span
-              class="glyphicon glyphicon-remove" 
               aria-hidden="true"
+              class="glyphicon glyphicon-remove" 
+              onClick={{delete}}
             />
           </a>
         </td>
@@ -162,16 +166,12 @@ export class MainElement extends ContainerComponent {
     const self = this;
 
     this.addClickEventListeners({
-      "#add": ()=>{
-        store.add()
-      },
-      "#run": ()=>{
-        store.run()
-      },
-      "#update":()=>store.update(),
-      "#runlots":()=>store.runLots(),
-      "#clear":()=>store.clear(),
-      "#swaprows":()=>store.swapRows()
+      "add": ()=>store.add(),
+      "run": ()=>store.run(),
+      "update":()=>store.update(),
+      "runlots":()=>store.runLots(),
+      "clear":()=>store.clear(),
+      "swaprows":()=>store.swapRows()
     });
     PresentationComponent.init(TableItem);
   }
@@ -187,22 +187,22 @@ export class MainElement extends ContainerComponent {
                     <div class="col-md-6">
                         <div class="row">
                             <div class="col-sm-6 smallpad">
-                            <button type="button" class="btn btn-primary btn-block" id="run">Create 1,000 rows</button>
+                            <button onClick={{run}} type="button" class="btn btn-primary btn-block">Create 1,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" id="runlots">Create 10,000 rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{runLots}}>Create 10,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" id="add" >Append 1,000 rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{add}} >Append 1,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" id="update">Update every 10th row</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{update}}>Update every 10th row</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" id="clear" >Clear</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{clear}} >Clear</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" id="swaprows">Swap Rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{swaprows}}>Swap Rows</button>
                             </div>
                         </div>
                     </div>
