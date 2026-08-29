@@ -375,8 +375,6 @@ class ContainerComponent extends HTMLElement {
   #clickEventListeners;
   #clickEventListenersAdded = false;
 
-  #templateData = null;
-  #templateContainers = null;
   #subscribedStores = [];
 
   componentStore = {};
@@ -385,10 +383,9 @@ class ContainerComponent extends HTMLElement {
   //HTML before loading animiation.
   #htmlBeforeLoading;
 
-  prevState = {};
-  static computedProps = {};
-  //static prevState = {}; 
-  static prevOrdering = {};
+  //prevState = {};
+  //static computedProps = {};
+  //static prevOrdering = {};
 
   static changeTemplateEvents = {};
   static clickTemplateEvents = {};
@@ -396,9 +393,6 @@ class ContainerComponent extends HTMLElement {
   static changeTemplateItemHandlers = {};
   static clickTemplateItemHandlers = {};
 
-  static templateFunctions = {};
-  static templateCount = 0;
-  templateIds = [];
 
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
@@ -415,7 +409,6 @@ class ContainerComponent extends HTMLElement {
     if(loadingIndicatorConfig){
       this.#loadingIndicatorConfig = loadingIndicatorConfig;
     }
-
 
     //Performance optimization if component is not subscribed to data stores.
     if(dataStoreSubscriptions.length === 0) {
@@ -571,7 +564,7 @@ class ContainerComponent extends HTMLElement {
 		const computedPropValues = 
       presentationItem.computePropValuesForNode(state);
 
-        let elementRoot;
+    let elementRoot;
 
     if(Object.keys(prevProps).length === 0){
 
