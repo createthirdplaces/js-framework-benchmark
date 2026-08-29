@@ -382,8 +382,6 @@ class ContainerComponent extends HTMLElement {
   componentStore = {};
   #templateLoaded = false;
 
-  #sharedTemplateState = {};
-
   //HTML before loading animiation.
   #htmlBeforeLoading;
 
@@ -759,17 +757,12 @@ class ContainerComponent extends HTMLElement {
       let isArray = false;
       let state = data[presentationItem.dataFieldName] || []; 
 
-      this.#sharedTemplateState[presentationItem.templateName] = {};
 
       const attrs = this.#presentationItems[i].attributes; 
       const attrData = [];
       for(let j=0;j<attrs.length;j++){
         if(attrs[j].value.startsWith("data")){
           const itemKey = attrs[j].value.split('.')[1];
-
-          this
-            .#sharedTemplateState[presentationItem.templateName][itemKey]
-            = data[itemKey]
 
           attrData.push({
             "name":attrs[j].name,
@@ -863,8 +856,6 @@ class ContainerComponent extends HTMLElement {
             presentationItem.prevState[updateData] = computedProps;
  
             const stateSlice = () =>{
-              console.log("Retrieving state slice");
-              console.log(presentationItem.prevState[updateData]);
               return presentationItem.prevState[updateData];
             }
            
@@ -1060,10 +1051,7 @@ class ContainerComponent extends HTMLElement {
 
                 e.preventDefault(); 
                 const handlerConfig = ContainerComponent.clickTemplateItemHandlers[id]
-                   
-                const sharedState 
-                  = this.#sharedTemplateState[handlerConfig.templateName]
-               
+                    
                 handlerConfig.templateFunction({
                   "event":e,
                   "containerAttrs":this.attributes,
@@ -1102,17 +1090,18 @@ class ContainerComponent extends HTMLElement {
       .forEach((node)=>{
         
         const eventHandlerName = node.attributes[clickSelectorName].value;
-        handlerMap[eventHandlerName] = this.#clickEventListeners[eventHandlerName];
+        node.removeAttribute(clickSelectorName);
+        
+        handlerMap[node.id] = this.#clickEventListeners[eventHandlerName];
     });
 
     this.addEventListener("click",(e)=>{
 
-      const attrs = e.target?.attributes
+      const clickId = e.target?.id;
 
-        if(attrs && attrs[clickSelectorName]){
-          const handlerName = e.target.attributes[clickSelectorName].value;
-          handlerMap[handlerName](e);
-        }
+      if(handlerMap[clickId]){
+        handlerMap[clickId](e);
+      }
     });
     
     this.#clickEventListenersAdded = true;
