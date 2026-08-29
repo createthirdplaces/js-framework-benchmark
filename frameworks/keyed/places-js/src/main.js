@@ -184,22 +184,22 @@ export class MainElement extends ContainerComponent {
                     <div class="col-md-6">
                         <div class="row">
                             <div class="col-sm-6 smallpad">
-                            <button onClick={{run}} type="button" class="btn btn-primary btn-block">Create 1,000 rows</button>
+                            <button onClick={{run}} type="button" class="btn btn-primary btn-block" id="run">Create 1,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" onClick={{runLots}}>Create 10,000 rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{runlots}} id="runlots">Create 10,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" onClick={{add}} >Append 1,000 rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{add}} id="add">Append 1,000 rows</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" onClick={{update}}>Update every 10th row</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{update}} id="update">Update every 10th row</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" onClick={{clear}} >Clear</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{clear}} id="clear">Clear</button>
                             </div>
                             <div class="col-sm-6 smallpad">
-                                <button type="button" class="btn btn-primary btn-block" onClick={{swaprows}}>Swap Rows</button>
+                                <button type="button" class="btn btn-primary btn-block" onClick={{swaprows}} id="swaprows">Swap Rows</button>
                             </div>
                         </div>
                     </div>
