@@ -108,7 +108,6 @@ class TableItem extends PresentationComponent {
   clickHandlers() {
     return {
       "select": ({componentId})=>{
-        console.log("Selecting:"+componentId);
         store.select(componentId);
       },
       "delete":({componentId})=>{
@@ -119,13 +118,11 @@ class TableItem extends PresentationComponent {
   
   defineComputedState() {
     return { 
-      "label": (state)=>{
-        return state.label;
+      "label": ({componentState})=>{
+        return componentState.label;
       },
-      "selected": (state)=>{
-        console.log("Reselecting");
-        console.log(state);
-        return state.id === state.selected ? 'danger' : '';
+      "selected": ({componentState,sharedState})=>{
+        return componentState.id == sharedState.selected ? 'danger' : '';
       }
     }
   }

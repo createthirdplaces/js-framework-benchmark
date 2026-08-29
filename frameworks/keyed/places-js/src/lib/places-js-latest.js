@@ -382,6 +382,8 @@ class ContainerComponent extends HTMLElement {
   componentStore = {};
   #templateLoaded = false;
 
+  #sharedTemplateState = {};
+
   //HTML before loading animiation.
   #htmlBeforeLoading;
 
@@ -661,15 +663,16 @@ class ContainerComponent extends HTMLElement {
 
         const newAttr = `data-${eventType}-id`;     
         const countVar = `${eventType}HandlerCount`;
-       
-        
+             
         const eventHandlerId = ContainerComponent[countVar];
         elem.setAttribute(newAttr,eventHandlerId);
       
         const handlerFieldName = `${eventType}TemplateItemHandlers`;
+
         ContainerComponent[handlerFieldName][eventHandlerId] = {
           "presentationId":addNode.id ?? "",
           "stateSlice":stateSlice,
+          "templateName":templateName,
           "templateFunction":templateFunctions[events[i]],
         }
         
@@ -741,7 +744,6 @@ class ContainerComponent extends HTMLElement {
         }
 
       for(let i=0;i<templates.length;i++){
-
         this.#setupTemplate(templates[i]);  
       }
 
@@ -753,16 +755,22 @@ class ContainerComponent extends HTMLElement {
     for(let i = 0; i < this.#presentationItems.length;i++){
 
       const presentationItem = this.#presentationItems[i];
-      let state = data[presentationItem.dataFieldName] || [];
-     
+      
       let isArray = false;
+      let state = data[presentationItem.dataFieldName] || []; 
 
+      this.#sharedTemplateState[presentationItem.templateName] = {};
 
       const attrs = this.#presentationItems[i].attributes; 
       const attrData = [];
       for(let j=0;j<attrs.length;j++){
         if(attrs[j].value.startsWith("data")){
           const itemKey = attrs[j].value.split('.')[1];
+
+          this
+            .#sharedTemplateState[presentationItem.templateName][itemKey]
+            = data[itemKey]
+
           attrData.push({
             "name":attrs[j].name,
             "itemKey":itemKey
@@ -772,7 +780,7 @@ class ContainerComponent extends HTMLElement {
           isArray = true;
         }
       }
-    
+  
       //template is a single item.
       if(!isArray){ 
         this.#updateSingleItemTemplate(this.#presentationItems[i], data);  
@@ -827,7 +835,11 @@ class ContainerComponent extends HTMLElement {
             const itemState = state[num];        
 						const computedProps = {}; 
             presentationComponent.computedProps.forEach((computedConfig)=>{
-              computedProps[computedConfig.field] = computedConfig.func(itemState,sharedData);
+              computedProps[computedConfig.field]
+                = computedConfig.func({
+                  "componentState":itemState,
+                  "sharedState":sharedData
+                });
             });
             
             const signalsToRun = presentationComponent.templateSignals;
@@ -850,8 +862,10 @@ class ContainerComponent extends HTMLElement {
 						addNode.id = signalData.id;           
             presentationItem.prevState[updateData] = computedProps;
  
-            const stateSlice = (state) =>{
-              return computedProps;
+            const stateSlice = () =>{
+              console.log("Retrieving state slice");
+              console.log(presentationItem.prevState[updateData]);
+              return presentationItem.prevState[updateData];
             }
            
             this.#setupTemplateEventListeners(
@@ -910,7 +924,8 @@ class ContainerComponent extends HTMLElement {
               const idx = presentationItem.prevOrdering.findIndex((elem)=>elem === id);
               presentationItem.prevOrdering.splice(idx,1); 
             });
-          } }
+          } 
+        }
       }
 
       let sameNumber = false;
@@ -977,7 +992,12 @@ class ContainerComponent extends HTMLElement {
             componentConfig
               .computedProps
               .forEach((computedConfig)=>{
-                computedPropValues[computedConfig.field] = computedConfig.func(itemState,sharedData);
+
+                computedPropValues[computedConfig.field] = 
+                  computedConfig.func({ 
+                    "componentState":itemState,
+                    "sharedState":sharedData
+                  })
             });
                   
             let updatedNode;
@@ -1003,49 +1023,7 @@ class ContainerComponent extends HTMLElement {
       }	
     }
   }
-
-  /*
-   * TODO: Setup to use single event with event delegation method
-   *  used by templates. 
-   */
-  setupChangeEventListeners(){
-    const rootNode = this.getRootNode();
-    const selectors = (this.#changeEventListeners && Object.keys(this.#changeEventListeners)) ?? [];
-    if(selectors.length > 0) {
-      selectors.forEach(selector=>{
-        const element = rootNode.querySelector(selector);
-        if(!element){
-          console.error(`Invalid selector ${selector} for click event handler`);
-        }
-        else {  
-          element.addEventListener("change",(e)=>{
-            e.preventDefault();
-            this.#changeEventListeners[selector]();
-          });
-        }
-      });
-    }
-  }
-  
-  setupClickEventListeners() {
-    const rootNode = this.getRootNode(); 
-    const selectors = (this.#clickEventListeners && Object.keys(this.#clickEventListeners)) || [];
-    if(selectors.length > 0) {
-      selectors.forEach(selector=>{
-        const element = this.querySelector(selector);
-        if(!element){
-          throw new Error(`Invalid selector ${selector} for click event handler`);
-        }
-        else {  
-          element.onclick = (e)=>{
-            e.preventDefault();
-						this.#clickEventListeners[selector]();
-          };
-        }
-      });
-    }
-  }
-  
+ 
   #initPresentationComponents(data) {
     this.#renderTemplates(data,this.getRootNode());
 
@@ -1064,8 +1042,8 @@ class ContainerComponent extends HTMLElement {
               if(id !== null){
                 ContainerComponent.changeTemplateItemHandlers[id].templateFunction({
                   "event":e,
-                  "componentAttrs": this.attributes,
-                  "state":ContainerComponent.changeTemplateItemHandlers[id].stateSlice(this.componentStore)
+                  "containeAttrs": this.attributes,
+                  "componentState":ContainerComponent.changeTemplateItemHandlers[id].stateSlice(this.componentStore)
                 })
               }
           });
@@ -1082,12 +1060,15 @@ class ContainerComponent extends HTMLElement {
 
                 e.preventDefault(); 
                 const handlerConfig = ContainerComponent.clickTemplateItemHandlers[id]
-
+                   
+                const sharedState 
+                  = this.#sharedTemplateState[handlerConfig.templateName]
+               
                 handlerConfig.templateFunction({
                   "event":e,
                   "containerAttrs":this.attributes,
-                  "componentId": handlerConfig.presentationId,
-                  "state":ContainerComponent.clickTemplateItemHandlers[id].stateSlice(this.componentStore) 
+                  "componentState":ContainerComponent.clickTemplateItemHandlers[id].stateSlice(),
+                  "componentId": handlerConfig.presentationId
                 })
               }
           });
@@ -1103,8 +1084,7 @@ class ContainerComponent extends HTMLElement {
       const sectionSplit = split[i].split("}}");
       const handlerName = sectionSplit[0];
       split[i]=`data-${this.nodeName}-click="${handlerName}"${sectionSplit[1]}`;
-    }
-   
+    }  
     return split.join("");
   }
 
