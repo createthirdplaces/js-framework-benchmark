@@ -1,6 +1,3 @@
-/**
- * Class to define a data store load action through an API call.
- */
 class ApiLoadAction{
 
   constructor(getRequestConfig) {
@@ -120,52 +117,79 @@ onfig:signal;
 }
 
 
-
-class BaseDynamicComponent extends HTMLElement {
-
-  #attachedEventsToShadowRoot = false;
-  #componentIsRendering = false;
-  #loadingFromStores = new Set();
-  #loadingStarted = 0;
-  #loadingIndicatorConfig;
-  
-  #templateData = null;
-  #templateContainers = null;
-  #subscribedStores = [];
-
-	//Stores state for the component.
-  componentStore = {};
-  #templateLoaded = false;
-
-  static computedProps = {};
-  static templates = {};
-  static templateSignals = {};
-  static dynamicSignals = {};
-  static prevState = {}; 
-  static prevOrdering = {};
-  static eventHandlers = {};
-
-  static templateFunctions = {};
-  static templateCount = 0;
-  templateIds = [];
-
-  static defineTemplate(templateFunc, templateName){
-
-    let template = document.createElement("template");
-    let templateStr = templateFunc();
-
-    let signals = [];
-    let dynamicSignals = [];
-
-    BaseDynamicComponent.computedProps[templateName.toUpperCase()] = [];   
-    BaseDynamicComponent.eventHandlers[templateName.toUpperCase()]= templateFunc.setupClickEventHandlers;
+class PresentationComponent {
  
-    //firstTagEnd = -1;
-    //TOOD: Optimize peformance. 
+  static presentationComponents = {};
+
+  clickTemplateEvents;
+  changeTemplateEvents;
+  computedProps;
+ 
+  dynamicSignals;
+  templateSignals;
+
+  templateNode;
+
+  #defineComponent(){
+
+    let computedState = this.defineComputedState() || {};
+    let template = document.createElement("template");
+    let templateStr = this.defineTemplate();
+
+    this.templateSignals = [];
+    this.dynamicSignals = [];
+
+    this.computedProps = [];   
+     
+    const clickEvents = [];
+    const changeEvents = [];
+
+    const clickHandlers = {};
+    const changeHandlers = {};
+
     const start = Date.now();
     let i = 0;
+
+    /* TOOD: Optimize. 
+     * This logic is running in O(m*n^2) time with repetitive iteration.
+     * n is the number of template items and m is the length of the template string.
+     * This logic should run in O(m*n) time or better.
+     */
+   
+    const clickEventsStr = templateStr.split("onClick={{");
+    if(clickEventsStr.length > 1){
+      for(let i=1;i<clickEventsStr.length;i++){
+        const j = clickEventsStr[i].indexOf("}}");
+        
+        const splitStr = clickEventsStr[i].slice(0,j);
+        clickEvents.push(splitStr);
+        clickEventsStr[i] = `data-click-id-${i-1}` + clickEventsStr[i].slice(j+2);
+      }
+
+      templateStr = clickEventsStr.join("");
+    
+    }
+
+
+    const changeEventsStr = templateStr.split("onChange={{");
+    if(changeEventsStr.length > 1){
+      for(let i=1;i<changeEventsStr.length;i++){ 
+        const j = changeEventsStr[i].indexOf("}}"); 
+        
+        const splitStr = changeEventsStr[i].slice(0,j);
+        changeEvents.push(splitStr);
+        changeEventsStr[i] = `data-change-id-${i-1}` + changeEventsStr[i].slice(j+2);
+      }
+      templateStr = changeEventsStr.join("");
+    }
+
+
+
+    this.changeTemplateEvents = changeEvents;
+    this.clickTemplateEvents = clickEvents;
+
     while(true){
-      const stateVarPos = templateStr.indexOf("{{");
+      let stateVarPos = templateStr.indexOf("{{");
       if(stateVarPos === -1){
         break;
       }
@@ -174,20 +198,54 @@ class BaseDynamicComponent extends HTMLElement {
       
       const endPos = templateStr.indexOf("}}");
       const signalStr = templateStr.substring(stateVarPos+2, endPos);
-      const data = signalStr.split("=");
-      const attr = data[0];
-      const fieldName = data[1];
 
+      let attr, fieldName;
+
+      if(templateStr.charAt(stateVarPos-1) === "="){
+        attr = "";
+        for(let j = stateVarPos-2; j > 0; j--){
+          const nameChar = templateStr.charAt(j);
+          if(this.isAttributeChar(nameChar)){
+            attr = nameChar + attr;
+          } else {
+            stateVarPos = j;
+            break;
+          }
+        }
+        fieldName = signalStr;
+      } else {
+        attr = "innerHTML"
+        fieldName = signalStr;
+      }
+
+      //Set signal for HTML and text template strings.
+      let isHTML = false;
+      let endTagPos = -1;
+
+      if(attr === "innerHTML"){
+        for(let j = stateVarPos -1; j >= 0; j--){
+          if(templateStr.charAt(j) === ">"){
+
+            endTagPos = j;
+            isHTML = true;
+            break;
+          } 
+        }
+      }
+        
       let newStr=`data-signal-id-${i}`;
       if(endPos < firstTagEnd){
         newStr = "";
       }
-      const templateFuncType = typeof templateFunc[fieldName];
-      if(templateFuncType === 'function'){
-        BaseDynamicComponent.computedProps[templateName.toUpperCase()].push(
+      
+      let templateFuncType = "";
+      if(computedState[fieldName]){
+
+        templateFuncType = "function";
+        this.computedProps.push(
           {
             "field": fieldName,
-            "func": templateFunc[fieldName]
+            "func": computedState[fieldName]
           });
       }
      
@@ -198,51 +256,154 @@ class BaseDynamicComponent extends HTMLElement {
         isOuter: endPos < firstTagEnd
       } 
 
-      if(newStr.length > 0 ){
-        templateStr = templateStr.substring(0,stateVarPos) +
-          newStr + templateStr.substring(endPos+2);
+      if(!isHTML){
+        if(newStr.length > 0 ){
+          templateStr = templateStr.substring(0,stateVarPos) +
+            newStr + templateStr.substring(endPos+2);
+        } else {
+          templateStr = templateStr.substring(0,stateVarPos) +
+            newStr + templateStr.substring(endPos+2);
+        }
       } else {
-        templateStr = templateStr.substring(0,stateVarPos-1) +
-          newStr + templateStr.substring(endPos+2);
+        templateStr =
+          templateStr.substring(0,endTagPos) +
+          " " +
+          newStr +
+          ">" +
+          templateStr.substring(endPos+2);
       }
 
-      signals.push(signalData);
+      this.templateSignals.push(signalData);
       if(templateFuncType === 'function'){
-        dynamicSignals.push(signalData);
+        this.dynamicSignals.push(signalData);
       }
       i++;
     } 
-    
+
     const split = templateStr.split("\n");
+
+    const linesToAdd = [];
     for(let i=0;i<split.length;i++){
-      const tagStart = split[i].indexOf("<");
-      if(tagStart > 0 && split[i].charAt(tagStart -1) !== "/"){
-        split[i]=split[i].substring(tagStart);
-      }
-      const tagEnd = split[i].indexOf(">");
-      if(tagEnd > 0 && tagEnd < split[i].length - 1 && split[i].charAt(tagEnd-1) !== "/"){
-        split[i]=split[i].substring(0,tagEnd+1);
-      }
-      split[i]=split[i].trim();
-      //Insert space for attributes
-      if(!split[i].endsWith(">")) {
-        split[i]=split[i]+" ";
+
+      ///Remove empty lines because they will
+      //be interpreted as empty text noddes.
+      if(split[i].length > 0){
+        split[i]=split[i].trim();
+        //Insert space for attributes
+        if(!split[i].endsWith(">")) {
+          split[i]=split[i]+" ";
+        }
+        linesToAdd.push(split[i]);
       }
     }
-    templateStr = split.join("");
+    templateStr = linesToAdd.join("");
 
-    BaseDynamicComponent.templateSignals[templateName.toUpperCase()] = signals;
-    BaseDynamicComponent.dynamicSignals[templateName.toUpperCase()] = dynamicSignals;
-
+    console.log(templateStr);
     template.innerHTML = templateStr;
-    BaseDynamicComponent.templateFunctions[templateName] = templateFunc;
     
-    
-    BaseDynamicComponent.templates[templateName.toUpperCase()] = template.content.firstChild;
-    BaseDynamicComponent.prevState[templateName.toUpperCase()]={};
-    BaseDynamicComponent.prevOrdering[templateName.toUpperCase()]=[];
+    this.templateNode = template.content.firstChild;
+
+    //Tenplate parsing needs to be optimized for performance.
+    //This is to display the overhead of the current logic.
+    const parseTime = Date.now() - start;
+    if(parseTime > 0){
+      console.warn(`Slow template parse time of ${parseTime} miliseconds`);
+    }
   }
 
+  isAttributeChar(str){
+    const code = str.charCodeAt(0);
+    return (code > 64 && code < 91) || (code > 96 && code < 123)
+  }
+  
+  static init(item){
+
+    const obj = new item.prototype.constructor(); 
+    obj.#defineComponent();
+
+    PresentationComponent
+      .presentationComponents[obj.constructor.name.toUpperCase()] = obj;
+  }
+  
+  defineTemplate(){
+    console.error("No template defined");
+  } 
+}
+
+class PresentationItem {
+ 
+  prevOrdering = [];
+  prevState = {};
+
+  prevStateLen(){
+    return Object.keys(this.prevState).length;
+  }
+
+  setTemplateName(templateName){
+    this.templateName = templateName.toUpperCase();
+  }
+  
+  computePropValuesForNode(state){
+    let computedPropValues = {};
+
+    PresentationComponent
+      .presentationComponents[this.templateName]
+      .computedProps
+      .forEach((computedConfig)=>{
+        computedPropValues[computedConfig.field] = computedConfig.func(state);
+      });
+    return computedPropValues;
+  }
+  
+  createTemplateNode(){
+    return PresentationComponent
+      .presentationComponents[this.templateName]
+      .templateNode
+      .cloneNode(true)
+  }
+      
+}
+
+class ContainerComponent extends HTMLElement {
+
+  //TODO: Remove variables here that aren't being used. 
+  #componentIsRendering = false;
+  #loadingFromStores = new Set();
+  #loadingStarted = 0;
+  #loadingIndicatorConfig;
+ 
+  #changeEventListeners;
+  #clickEventListeners;
+
+  #templateData = null;
+  #templateContainers = null;
+  #subscribedStores = [];
+
+  componentStore = {};
+  #templateLoaded = false;
+
+  //HTML before loading animiation.
+  #htmlBeforeLoading;
+
+  prevState = {};
+  static computedProps = {};
+  //static prevState = {}; 
+  static prevOrdering = {};
+
+  static changeTemplateEvents = {};
+  static clickTemplateEvents = {};
+
+  static changeTemplateItemHandlers = {};
+  static clickTemplateItemHandlers = {};
+
+  static templateFunctions = {};
+  static templateCount = 0;
+  templateIds = [];
+
+  static clickHandlerCount = 0;
+  static changeHandlerCount = 0;
+
+  #presentationItems = [];
 	/**
 	 * @param dataStoreSubscriptions - An array of data stores the component should
 	 * subscribe to.
@@ -255,9 +416,9 @@ class BaseDynamicComponent extends HTMLElement {
       this.#loadingIndicatorConfig = loadingIndicatorConfig;
     }
 
+
     //Performance optimization if component is not subscribed to data stores.
     if(dataStoreSubscriptions.length === 0) {
-      this.updateData({});
       return;
     }
 		
@@ -268,15 +429,22 @@ class BaseDynamicComponent extends HTMLElement {
     }
 
     this.updateFromSubscribedStores();
+
+    this._internals = this.attachInternals();
   }
 
- #generateSignal(params){
+  init(initialState){
+    this.updateData(initialState);
+  }
+  
+  #generateSignal(params){
 
 		const {
 			fieldName,
 			attr,
 			isOuter,
-			signalId } = params.signalConfig
+			signalId
+		} = params.signalConfig
     
 		const{ 
       signalData,
@@ -292,12 +460,14 @@ class BaseDynamicComponent extends HTMLElement {
     else {    
       element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
     }
-  
+ 
     if(updated === '') {
       element.removeAttribute(attr);
     }
     else {
-      if(attr==="textContent"){
+      if (attr === "innerHTML"){
+        element.textContent = updated;
+      } else if(attr==="textContent"){
         element.textContent = updated;
       } else {
         element.setAttribute(attr,`${updated}`);
@@ -305,8 +475,12 @@ class BaseDynamicComponent extends HTMLElement {
     }
   }
 
+  addChangeEventListeners(eventListeners){
+    this.#changeEventListeners = eventListeners;
+  }
+  
   addClickEventListeners(eventListeners){
-    this.clickEventListeners = eventListeners;
+    this.#clickEventListeners = eventListeners;
   }
 	
   /**
@@ -325,6 +499,8 @@ class BaseDynamicComponent extends HTMLElement {
     }
 
     if(this.#loadingIndicatorConfig){ 
+      
+      this.#htmlBeforeLoading = this.innerHTML;
       this.innerHTML = this.#loadingIndicatorConfig.generateLoadingIndicatorHtml();
     }
   }
@@ -353,7 +529,6 @@ class BaseDynamicComponent extends HTMLElement {
       this.#componentIsRendering = false;
     }
   }
-
   updateFromSubscribedStores() {
 
     let allSubscribedStoresHaveData = true;
@@ -387,107 +562,253 @@ class BaseDynamicComponent extends HTMLElement {
       );
     }
   }
+
+  #updateSingleItemTemplate(presentationItem,state){
+   
+    const templateName = presentationItem.templateName;
+
+    const prevProps = presentationItem.prevState;
+		const computedPropValues = 
+      presentationItem.computePropValuesForNode(state);
+
+        let elementRoot;
+
+    if(Object.keys(prevProps).length === 0){
+
+      elementRoot = presentationItem.createTemplateNode();
+      
+      const signalsToRun = PresentationComponent.presentationComponents[templateName].templateSignals;
+
+      signalsToRun.forEach((signalConfig)=>{
+        this.#generateSignal(
+          { 
+            signalConfig: signalConfig,
+            updateData: {
+              "signalData":computedPropValues,
+              "elementRoot": elementRoot,
+            }
+          });
+      });
+
+      const stateSlice = (state)=>{return state};
+      this.#setupTemplateEventListeners(
+        elementRoot,
+        stateSlice,
+        templateName  
+      );
+
+    } else {
+
+      elementRoot = document.getElementById(presentationItem.id);
+        
+      if(!elementRoot){
+        console.error("No id set for template");
+      }   
+    }
+
+    const signalsToRun = PresentationComponent.presentationComponents[templateName].dynamicSignals;
+
+		signalsToRun.forEach((signalConfig)=>{
+		  if(prevProps[signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
+			 
+          this.#generateSignal(
+            { 
+              signalConfig: signalConfig,
+              updateData: {
+                "signalData":computedPropValues,
+                "elementRoot": elementRoot
+              }
+            });	
+				}
+    });
+
+    if(Object.keys(prevProps).length === 0){
+      document.getElementById(presentationItem.id).replaceChildren(elementRoot);
+    }
+   
+    presentationItem.prevState = computedPropValues;
+    
+  }
+
+  #setupEventListeners(
+    addNode,
+    eventType,
+    stateSlice,
+    templateName
+  ){
+
+    const eventFieldName = `${eventType}TemplateEvents` 
+    const defineName = `${eventType}Handlers`;
+
+    let events = [];
+    let templateFunctions;
+    const presentationComponent = PresentationComponent.presentationComponents[templateName];
+
+    if(presentationComponent[eventFieldName]){
+      events = presentationComponent[eventFieldName];
+
+      if(events.length > 0) { 
+        templateFunctions = presentationComponent[defineName]();
+      }
+    }
+   
+    
+    if(events && events.length > 0){
+      for(let i=0;i<events.length;i++){
+
+        const oldEventName = `data-${eventType}-id-${i}`;
+        const elem = addNode.querySelector(`[${oldEventName}]`); 
+        
+        elem.removeAttribute(oldEventName);
+
+        const newAttr = `data-${eventType}-id`;
+       
+        const countVar = `${eventType}HandlerCount`;
+        elem.setAttribute(newAttr,ContainerComponent[countVar]);
+      
+        const handlerFieldName = `${eventType}TemplateItemHandlers`;
+        ContainerComponent[handlerFieldName][i] = {
+          "stateSlice":stateSlice,
+          "templateFunction":templateFunctions[events[i]],
+        }
+        
+        ContainerComponent[countVar]++; 
+      }
+    }
+  }
+  
+  #setupTemplateEventListeners(
+    addNode,
+    stateSlice,
+    templateName  
+  ){
+    this.#setupEventListeners(addNode,"click",stateSlice,templateName);
+    this.#setupEventListeners(addNode,"change",stateSlice,templateName);
+  }
  
+  #setupTemplate(templateItem){
+    
+    let attrs = [];
+    const attrNames = templateItem.getAttributeNames();
+    const dataFieldName = templateItem.getAttribute("data-state");
+    const dataTemplateName = templateItem.getAttribute("data-component");
+
+    for(let j=0;j<attrNames.length;j++){
+      const attrName = attrNames[j]; 
+      const attrValue = templateItem.getAttribute(attrName);
+      if(attrName.startsWith("data")||attrValue.startsWith("data")){
+        templateItem.removeAttribute(attrName);
+      }
+      attrs.push({
+        name:attrName,
+        value:attrValue
+      });
+    }   
+    
+    templateItem.id = `template-${ContainerComponent.templateCount}-${dataTemplateName}`;
+
+    this.#renderTemplates.templateIds.push({
+      "id":templateItem.id,
+      "templateName":dataTemplateName
+    });
+ 
+    if(!dataFieldName){
+      throw new Error(`No data field defined for template ${dataTemplateName} in component ${this.nodeName}`);
+    }
+   
+    let presentationItem = new PresentationItem(); 
+    presentationItem.id = templateItem.id;
+    presentationItem.setTemplateName(dataTemplateName);
+    presentationItem.attributes = attrs;
+
+    presentationItem.dataFieldName = dataFieldName;
+
+    this.#presentationItems.push(presentationItem);
+
+    ContainerComponent.templateCount++;
+
+  }
+  
   #renderTemplates(data,content) {
 
     this.#renderTemplates.templateIds = []; 
-    
-    if(!this.#templateData){
+    if(!this.#presentationItems || Object.keys(this.#presentationItems).length === 0){
 
-      const templates = content.querySelectorAll("[data-template-name]");
-      
+      const templates = content.querySelectorAll("[data-component]");
+			if(!this.#presentationItems){
+          this.#presentationItems = {};;
+        }
+
       for(let i=0;i<templates.length;i++){
 
-        if(!this.#templateData){
-          this.#templateData = [];
-        }
-        let attrs = [];
-        const attrNames = templates[i].getAttributeNames();
-        const dataFieldName = templates[i].getAttribute("data-array");
-        const dataTemplateName = templates[i].getAttribute("data-template-name");
-
-        for(let j=0;j<attrNames.length;j++){
-          const attrName = attrNames[j]; 
-          const attrValue = templates[i].getAttribute(attrName);
-          if(attrName.startsWith("data")||attrValue.startsWith("data")){
-            templates[i].removeAttribute(attrName);
-          }
-          attrs.push({
-            name:attrName,
-            value:attrValue
-          });
-        }   
-       
-        templates[i].id = `template-${BaseDynamicComponent.templateCount}-${dataTemplateName}`;
- 
-        this.#renderTemplates.templateIds.push({
-          "id":templates[i].id,
-          "templateName":dataTemplateName
-        });
-        
-        this.#templateData.push({
-          attributes:attrs,
-          dataFieldName:dataFieldName,
-          dataTemplateName: templates[i].id
-        });
-        BaseDynamicComponent.templateCount++;
-      } 
-      this.#templateLoaded = true;
-    }
-    
-    for(let i = 0; i < this.#templateData.length;i++){
-              
-      const templateName = 
-        this.#templateData[i]
-          .dataTemplateName
-          .split("-")[2]
-          .toUpperCase();  
-      
-      const state = data[this.#templateData[i].dataFieldName] || []; 
-     
-      const attrs = this.#templateData[i].attributes; 
-      const attrData = [];
-      for(let j=0;j<attrs.length;j++){
-        if(attrs[j].name !== "data-array"){
-          if(attrs[j].value.startsWith("data")){
-            const itemKey = attrs[j].value.split('.')[1];
-            attrData.push({
-              "name":attrs[j].name,
-              "itemKey":itemKey
-            });
-          }
-        }
+        this.#setupTemplate(templates[i]);  
       }
 
+			if(this.#presentationItems.length > 0 ){
+				this.#templateLoaded = true;
+			}
+    }
+ 
+    for(let i = 0; i < this.#presentationItems.length;i++){
 
-      const prevStateLen = Object.keys(BaseDynamicComponent.prevState[templateName]).length;
+      const presentationItem = this.#presentationItems[i];
+      let state = data[presentationItem.dataFieldName] || [];
+     
+      let isArray = false;
+
+
+      const attrs = this.#presentationItems[i].attributes; 
+      const attrData = [];
+      for(let j=0;j<attrs.length;j++){
+        if(attrs[j].value.startsWith("data")){
+          const itemKey = attrs[j].value.split('.')[1];
+          attrData.push({
+            "name":attrs[j].name,
+            "itemKey":itemKey
+          });
+        }
+        if(attrs[j].name === "data-repeat"){
+          isArray = true;
+        }
+      }
+    
+      //template is a single item.
+      if(!isArray){ 
+        console.log("Is single template item");
+        this.#updateSingleItemTemplate(this.#presentationItems[i], data);  
+        continue;
+      }
+    
+      const prevStateLen = this.#presentationItems[i].prevStateLen();
     
       const updatedOrdering = [];
       
       const prevIds = new Set();
       const newIds = new Set();
 
-      let sameLocs = true;
+			let sameLocs = true;
       for(let num=0;num<Math.max(state.length,prevStateLen);num++){
         if(num<state.length){
           updatedOrdering.push(state[num].id);
           newIds.add(state[num].id);
         }
         if(num < prevStateLen){
-          prevIds.add(BaseDynamicComponent.prevOrdering[templateName][num]);
+          prevIds.add(this.#presentationItems[i].prevOrdering[num]);
         }
-        if(!state[num] || state[num].id !== BaseDynamicComponent.prevOrdering[templateName][num]){
+        if(!state[num] || state[num].id !== presentationItem.prevOrdering[num]){
           sameLocs = false; 
         }
       }
-    
+   
+      const presentationComponent = PresentationComponent.presentationComponents[presentationItem.templateName];
+
       const removed = sameLocs ? new Set() : prevIds.difference(newIds);
       const added = sameLocs ? new Set() : newIds.difference(prevIds);
-
-      let hasReplaced = false;
+      let hasReplaced = (removed.size === prevIds.size && removed.size === added.size);
       if(added.size > 0){
 
-        const lastId = BaseDynamicComponent.prevOrdering[templateName][prevStateLen-1];
+        const lastId = presentationItem
+          .prevOrdering[prevStateLen-1];
         
 				const sharedData = {};
 				for(let j=0;j<attrData.length;j++){
@@ -497,113 +818,108 @@ class BaseDynamicComponent extends HTMLElement {
 				let addFragment = null; 
         for(let num = 0; num < updatedOrdering.length; num++){
           const updateData = updatedOrdering[num]; 
-         
+        
           if(added.has(updateData)){
             if(addFragment === null){
-                addFragment = document.createDocumentFragment();
+              addFragment = document.createDocumentFragment();
             }
            
             const itemState = state[num];        
-
 						const computedProps = {}; 
-            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
+            presentationComponent.computedProps.forEach((computedConfig)=>{
               computedProps[computedConfig.field] = computedConfig.func(itemState,sharedData);
             });
             
-            const signalsToRun = BaseDynamicComponent.templateSignals[templateName];
+            const signalsToRun = presentationComponent.templateSignals;
 
-            let addNode = BaseDynamicComponent.templates[templateName].cloneNode(true);
+            let addNode = presentationItem.createTemplateNode();
 						const signalData =  {...computedProps,...itemState}
 
-						signalsToRun.forEach((signal)=>{ 
-             
-                this.#generateSignal(
-                  {
-                    signalConfig:signal,
-                    updateData:{
-                      "signalData":signalData,
-                      "elementRoot":addNode,
-                    }
-                  }
-                );
+						signalsToRun.forEach((signal)=>{ 	
+              this.#generateSignal(
+								{
+									signalConfig:signal,
+									updateData:{
+										"signalData":signalData,
+										"elementRoot":addNode,
+									}
+								}
+							);
             })
+						
+						addNode.id = signalData.id;
            
-            BaseDynamicComponent.prevState[templateName][updateData] = computedProps;
-            const eventHandlers = BaseDynamicComponent.eventHandlers[templateName];
-            if(eventHandlers){
-              this.#setupClickEventListeners(
-                addNode,
-                eventHandlers,
-                rowProps);
+            presentationItem.prevState[updateData] = computedProps;
+
+            const stateSlice = (state) =>{
+              return state[this.#templateData[i].dataFieldName][num]
             }
+            
+            this.#setupTemplateEventListeners(
+              addNode,
+              stateSlice,
+              presentationItem.templateName
+            );
             addFragment.appendChild(addNode);
           }else {
             if(addFragment !== null){
               const curNode = this.getRootNode().getElementById(""+updateData); 
-              //requestAnimationFrame(()=>{ 
-                curNode.parent.insertBefore(addFragment,curNode); 
-              //});
+							curNode.parentNode.insertBefore(addFragment,curNode); 
               addFragment = null;
             }
           }
         }
-      
+     
         if(addFragment !== null){
 
           if(added.size < newIds.size - removed.size) { 
             const lastNode = this.getRootNode().getElementById(""+lastId);
             const add = document.createDocumentFragment();
             add.replaceChildren(addFragment); 
-            requestAnimationFrame(()=>{
-              lastNode.parentNode.appendChild(add);
-            });
+            lastNode.parentNode.appendChild(add);
           } else{
-            requestAnimationFrame(()=>{
 							this.getRootNode()
-								.getElementById(this.#templateData[i].dataTemplateName)
+								.getElementById(presentationItem.id)
 								.replaceChildren(addFragment);
-							hasReplaced = true;
-						});
+								hasReplaced = true;
           }          
         }
-        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering;
+        presentationItem.prevOrdering = updatedOrdering;
       }
 
-      
-      if(removed.size > 0) {
-        
-        if(removed.size === prevIds.size && !hasReplaced){
+      if(removed.size > 0) { 
+				if(removed.size === prevIds.size && !hasReplaced){
 
-            this.getRootNode()
-                .getElementById(this.#templateData[i].dataTemplateName)
-                .replaceChildren([]);
-            BaseDynamicComponent.prevState[templateName] = {};
-          break; 
+          const templateElem = this.getRootNode()
+              .getElementById(presentationItem.id)
+          templateElem.replaceChildren([]);
+          
+					break; 
         }
 
         removed.forEach((id)=>{
-            delete BaseDynamicComponent.prevState[templateName][id] 
+          delete presentationItem.prevState[id] 
         });
 
         if(!hasReplaced){ 
           if(newIds.size > 0) {
             const self = this;
             removed.forEach((id)=>{ 
-              const node = self.getRootNode().getElementById(""+id);
-              node.parentNode.removeChild(node);
-              const idx = BaseDynamicComponent.prevOrdering[templateName].findIndex((elem)=>elem === id);
-              BaseDynamicComponent.prevOrdering[templateName].splice(idx,1); 
+							const searchId = `[id="${id}"]`;
+              const node = self.querySelector(searchId);
+							node.parentNode.removeChild(node);
+              const idx = presentationItem.prevOrdering.findIndex((elem)=>elem === id);
+              presentationItem.prevOrdering.splice(idx,1); 
             });
-          }
-        }
+          } }
       }
 
       let sameNumber = false;
-      if(!hasReplaced && updatedOrdering.length === BaseDynamicComponent.prevOrdering[templateName].length){
+      if(!hasReplaced && updatedOrdering.length === presentationItem.prevOrdering.length){
         sameNumber = true; 
         let moveNodes = [];
         for(let num=0;num<updatedOrdering.length;num++){
-          if(updatedOrdering[num] !== BaseDynamicComponent.prevOrdering[templateName][num]){
+          if(updatedOrdering[num] !== presentationItem.prevOrdering[num]){
           
             let insertBefore = null;
             if (num < updatedOrdering.length -1){
@@ -619,33 +935,28 @@ class BaseDynamicComponent extends HTMLElement {
         }
         
         if(moveNodes.length > 0){
-
-          requestAnimationFrame(()=>{
-            for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
-             
-              const moveData = moveNodes[mNum];
-
-              const nodeToMove = this.getRootNode().getElementById(
-                moveData.moveId);
-            
-              if(moveData.prevNode !== null){
-                moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
-              } else {
-                nodeToMove.parentNode.appendChild(nodeToMove);
-              }
+          for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
+           
+            const moveData = moveNodes[mNum];
+            const nodeToMove = this.getRootNode().getElementById(
+              moveData.moveId);
+          
+            if(moveData.prevNode !== null){
+              moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
+            } else {
+              nodeToMove.parentNode.appendChild(nodeToMove);
             }
-          });
+          }
         }
-        BaseDynamicComponent.prevOrdering[templateName] = updatedOrdering; 
+        presentationItem.prevOrdering = updatedOrdering;
       }
-       
+    	
       if(hasReplaced){
         break;
       }
 
       if(sameNumber){
 				let start = Date.now();
-        //requestAnimationFrame(()=>{
       	
 					const sharedData = {};
 					for(let j=0;j<attrData.length;j++){
@@ -657,18 +968,23 @@ class BaseDynamicComponent extends HTMLElement {
             const id = state[num].id;
             const itemState = state[num];        
            
-            const prevProps = BaseDynamicComponent.prevState[templateName][""+id]                   
+            const prevProps = presentationItem.prevState[""+id]                   
 						const computedPropValues = {}; 
 						//Calculate computed values.
-            BaseDynamicComponent.computedProps[templateName].forEach((computedConfig)=>{
-              computedPropValues[computedConfig.field] = computedConfig.func(itemState, sharedData);
-            });
+           
+            const componentConfig = PresentationComponent
+              .presentationComponents[presentationItem.templateName]
 
+            componentConfig
+              .computedProps
+              .forEach((computedConfig)=>{
+                computedPropValues[computedConfig.field] = computedConfig.func(itemState,sharedData);
+            });
                   
             let updatedNode;
-            const signalsToRun = BaseDynamicComponent.dynamicSignals[templateName];
-						signalsToRun.forEach((signalConfig)=>{
-							if(BaseDynamicComponent.prevState[templateName][id][signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
+						
+            componentConfig.dynamicSignals.forEach((signalConfig)=>{
+							if(presentationItem.prevState[id][signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
 							
 								this.#generateSignal(
 									{ 
@@ -683,16 +999,19 @@ class BaseDynamicComponent extends HTMLElement {
 
 						});
 						
-						BaseDynamicComponent.prevState[templateName][id] = computedPropValues;
-          }
-					console.log(Date.now()-start);
-				//});
-      }
+						presentationItem.prevState[id] = computedPropValues;
+        }
+      }	
     }
   }
- 
-  #setupClickEventListeners(rootNode,clickEventListeners,params) {
-    const selectors = Object.keys(clickEventListeners);
+
+  /*
+   * TODO: Setup to use single event with event delegation method
+   *  used by templates. 
+   */
+  setupChangeEventListeners(){
+    const rootNode = this.getRootNode();
+    const selectors = (this.#changeEventListeners && Object.keys(this.#changeEventListeners)) ?? [];
     if(selectors.length > 0) {
       selectors.forEach(selector=>{
         const element = rootNode.querySelector(selector);
@@ -700,23 +1019,92 @@ class BaseDynamicComponent extends HTMLElement {
           console.error(`Invalid selector ${selector} for click event handler`);
         }
         else {  
+          element.addEventListener("change",(e)=>{
+            e.preventDefault();
+            this.#changeEventListeners[selector]();
+          });
+        }
+      });
+    }
+  }
+  
+  setupClickEventListeners() {
+    const rootNode = this.getRootNode(); 
+    const selectors = (this.#clickEventListeners && Object.keys(this.#clickEventListeners)) || [];
+    if(selectors.length > 0) {
+      selectors.forEach(selector=>{
+        const element = this.querySelector(selector);
+        if(!element){
+          throw new Error(`Invalid selector ${selector} for click event handler`);
+        }
+        else {  
           element.onclick = (e)=>{
-						requestAnimationFrame(()=>{
-							clickEventListeners[selector](params);
-						});
+            e.preventDefault();
+						this.#clickEventListeners[selector]();
           };
         }
       });
     }
   }
+  
+  #initPresentationComponents(data) {
+    this.#renderTemplates(data,this.getRootNode());
 
+      this.#renderTemplates.templateIds.forEach((templateId)=>{
+    
+        const changeHandlers = ContainerComponent.changeTemplateEvents[templateId.templateName.toUpperCase()]
+
+        if(PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()].changeTemplateEvents){
+          this.getRootNode().getElementById(templateId.id)
+            .addEventListener("change",(e)=>{
+
+              const id = e.target.getAttribute("data-change-id") || 
+                         e.target.parentNode.getAttribute("data-change-id") ||  
+                         e.target.parentNode.parentNode.getAttribute("data-change-id")
+
+              if(id !== null){
+                ContainerComponent.changeTemplateItemHandlers[id].templateFunction({
+                  "event":e,
+                  "componentAttrs": this.attributes,
+                  "state":ContainerComponent.changeTemplateItemHandlers[id].stateSlice(this.componentStore)
+                })
+              }
+          });
+        }
+        
+        if(PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()].clickTemplateEvents){
+          this.getRootNode().getElementById(templateId.id)
+            .addEventListener("click",(e)=>{
+              const id = e.target.getAttribute("data-click-id")
+                      || e.target.parentNode.getAttribute("data-click-id") 
+                      || e.target.parentNode.parentNode.getAttribute("data-click-id") 
+
+
+              if(id !== null) {
+
+                e.preventDefault(); 
+                ContainerComponent.clickTemplateItemHandlers[id].templateFunction({
+                  "event":e,
+                  "componentAttrs":this.attributes,
+                  "state":ContainerComponent.clickTemplateItemHandlers[id].stateSlice(this.componentStore) 
+                })
+              }
+          });
+        }
+          
+      });
+      this.setupClickEventListeners();  
+      this.setupChangeEventListeners();
+  }
+	
   #generateAndSaveHTML(data) {
 
 
     //Don't re-render static HTML if templates are being used.
     if(!this.#templateLoaded){
-      const template = document.createElement("template");
+      //const template = document.createElement("template");
       if(this.#loadingStarted > 0){
+
         const current = Date.now();
         const loadTime = current - this.#loadingStarted;
 
@@ -730,42 +1118,32 @@ class BaseDynamicComponent extends HTMLElement {
           const self = this;
           if(remainingTime > 0){
             setTimeout(()=>{
-              template.innerHTML = this.render(data);
+              //template.innerHTML = this.render(data);
+							this.innerHTML = this.render(data);
             },remainingTime);
           } else {
-            template.innerHTML = this.render(data);
+            this.innerHTML = this.render(data);
           }
         } else {
-          template.innerHTML = this.render(data);
+          this.innerHTML = this.render(data);
         }
       }
       else {
-        template.innerHTML = this.render(data);
+        this.innerHTML = this.render(data);
       }
 
-      this.innerHTML = "";
-      this.#renderTemplates(data,template.content);
-      this.innerHTML = template.innerHTML;
+      this.#initPresentationComponents(data);
+		} else {
 
-      this.#renderTemplates.templateIds.forEach((templateId)=>{
-        
-        const func = BaseDynamicComponent.templateFunctions[templateId.templateName];
-				if(func.clickHandler){ 
-          this.getRootNode().getElementById(templateId.id)
-            .addEventListener("click",func.clickHandler);
-        }
-      });
-
-      if(this.clickEventListeners){
-        this.#setupClickEventListeners(this.getRootNode(),this.clickEventListeners);  
+      if(this.#htmlBeforeLoading){
+        this.innerHTML = this.#htmlBeforeLoading;  
       }
-    } else {
-      this.#renderTemplates(data,this);
-    }
-  }
+			this.#renderTemplates(data,this);
+    }		
+  } 
 }
 
-class BaseTemplateComponent extends HTMLElement {
+class ShadowDOMComponent extends HTMLElement {
   connectedCallback() {
     this.attachShadow({ mode: "open" });
 
@@ -790,7 +1168,6 @@ class CustomLoadAction {
     };
   }
 }
-
 
 class DataStore {
 
@@ -927,4 +1304,4 @@ class DataStore {
   }
 }
 
-export { ApiLoadAction, BaseDynamicComponent, BaseTemplateComponent, CustomLoadAction, DataStore };
+export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, PresentationComponent};
