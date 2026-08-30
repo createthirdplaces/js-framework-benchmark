@@ -656,7 +656,7 @@ class ContainerComponent extends HTMLElement {
       
     } else {
 
-      elementRoot = document.getElementById(presentationItem.id);
+      elementRoot = this.getRootNode().getElementById(presentationItem.id);
         
       if(!elementRoot){
         console.error("No id set for template");
@@ -869,10 +869,10 @@ class ContainerComponent extends HTMLElement {
             add.replaceChildren(addFragment); 
             lastNode.parentNode.appendChild(add);
           } else{
-							document
+							this.getRootNode()
 								.getElementById(presentationItem.id)
 								.replaceChildren(addFragment);
-								hasReplaced = true;
+							hasReplaced = true;
           }          
         }
         presentationItem.prevOrdering = updatedOrdering;
@@ -881,7 +881,7 @@ class ContainerComponent extends HTMLElement {
       if(removed.size > 0) { 
 				if(removed.size === prevIds.size && !hasReplaced){
 
-          const templateElem = document.getElementById(presentationItem.id)
+          const templateElem = this.getRootNode().getElementById(presentationItem.id)
           templateElem.replaceChildren([]);
           
 					break; 
@@ -987,7 +987,7 @@ class ContainerComponent extends HTMLElement {
 										signalConfig: signalConfig,
 										updateData: {
 											"signalData":computedPropValues,
-											"elementRoot": document.getElementById(""+id),
+											"elementRoot": this.getRootNode().getElementById(""+id),
 										}
 									}
 								);
