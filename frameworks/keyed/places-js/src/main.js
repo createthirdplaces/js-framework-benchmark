@@ -130,7 +130,7 @@ class TableItem extends PresentationComponent {
   
   defineTemplate(){ 
     return `
-      <tr id={{id}} class={{selected}}>
+      <tr class={{selected}}>
         <td class="col-md-1" textContent={{id}}/>
         <td class="col-md-4">
           <a 

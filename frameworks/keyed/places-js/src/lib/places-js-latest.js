@@ -131,7 +131,6 @@ class PresentationComponent {
   templateNode;
 
   #handlerDepthMap = {};
-  #signalSelectors = {};
 
   #defineComponent(){
 
@@ -487,7 +486,9 @@ class ContainerComponent extends HTMLElement {
   init(initialState){
     this.updateData(initialState);
   }
-  
+ 
+  #selectorCache = {};
+
   #generateSignal(params){
 
 		const {
@@ -508,7 +509,14 @@ class ContainerComponent extends HTMLElement {
    
 
     if(!isOuter){       
-      element=element.querySelector(signalPath);
+      const cacheId = `${elementRoot.id}-${signalId}`;
+
+      if(!(cacheId in this.#selectorCache)){
+        element=element.querySelector(signalPath);
+        this.#selectorCache[cacheId] = element;
+      } else {
+        element = this.#selectorCache[cacheId];
+      }
     }
 
     //TODO: Consider removing this line.
@@ -582,6 +590,7 @@ class ContainerComponent extends HTMLElement {
       this.#componentIsRendering = false;
     }
   }
+  
   updateFromSubscribedStores() {
 
     let allSubscribedStoresHaveData = true;
@@ -823,10 +832,10 @@ class ContainerComponent extends HTMLElement {
             });
             
             const signalsToRun = presentationComponent.templateSignals;
-
-            let addNode = presentationItem.createTemplateNode();
-	
             const signalData =  {...computedProps,...itemState}
+
+            let addNode = presentationItem.createTemplateNode(); 
+						addNode.id = signalData.id;           
 
 						signalsToRun.forEach((signal)=>{ 	
               this.#generateSignal(
@@ -840,7 +849,6 @@ class ContainerComponent extends HTMLElement {
 							);
             })
 						
-						addNode.id = signalData.id;           
             presentationItem.prevState[updateData] = computedProps;
  
             addFragment.appendChild(addNode);
