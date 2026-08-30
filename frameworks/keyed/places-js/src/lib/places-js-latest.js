@@ -351,7 +351,7 @@ class PresentationComponent {
 
         childNodePath = childNodePath.reverse();
         node.attributes.removeNamedItem(signal.signalPath);
-        signal.signalPath = childNodePath.join(" ");
+        signal.signalPath = childNodePath.join(">");
       }
     });
 
@@ -505,7 +505,8 @@ class ContainerComponent extends HTMLElement {
     
     let updated = signalData[fieldName];  
     let element = elementRoot;
-    
+   
+
     if(!isOuter){       
       element=element.querySelector(signalPath);
     }
@@ -657,7 +658,7 @@ class ContainerComponent extends HTMLElement {
 
 		signalsToRun.forEach((signalConfig)=>{
 		  if(prevProps[signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
-			 
+			
           this.#generateSignal(
             { 
               signalConfig: signalConfig,
