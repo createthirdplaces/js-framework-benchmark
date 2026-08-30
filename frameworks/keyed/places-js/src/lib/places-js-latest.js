@@ -131,6 +131,7 @@ class PresentationComponent {
   templateNode;
 
   #handlerDepthMap = {};
+  #signalSelectors = {};
 
   #defineComponent(){
 
@@ -168,10 +169,8 @@ class PresentationComponent {
         clickEventsStr[i] = `data-click-id=${i-1}` + clickEventsStr[i].slice(j+2);
       }
 
-      templateStr = clickEventsStr.join("");
-    
+      templateStr = clickEventsStr.join("");    
     }
-
 
     const changeEventsStr = templateStr.split("onChange={{");
     if(changeEventsStr.length > 1){
@@ -188,6 +187,8 @@ class PresentationComponent {
     this.changeTemplateEvents = changeEvents;
     this.clickTemplateEvents = clickEvents;
 
+    const signalIds = [];
+  
     while(true){
       let stateVarPos = templateStr.indexOf("{{");
       if(stateVarPos === -1){
@@ -234,6 +235,7 @@ class PresentationComponent {
       }
         
       let newStr=`data-signal-id-${i}`;
+
       if(endPos < firstTagEnd){
         newStr = "";
       }
@@ -253,6 +255,7 @@ class PresentationComponent {
         fieldName,
         attr,
         "signalId":newStr.length > 0 ? i : -1,
+        signalPath: newStr,
         isOuter: endPos < firstTagEnd
       } 
 
@@ -324,6 +327,33 @@ class PresentationComponent {
           this.#handlerDepthMap[handlerDepthKey] = depth;  
         });
     });
+    
+    this.templateSignals.forEach((signal)=>{
+      
+      // A signal id of less than one means that the data is 
+      // at the root.      
+      if(signal.signalId >= 0){
+
+        const selector = `[${signal.signalPath}]`
+
+        let childNodePath = [];
+        let node = this.templateNode.querySelector(selector);
+        let searchNode = node;
+
+        while(searchNode.parentNode.nodeName !== "#document-fragment"){ 
+          for(let i=0;i<searchNode.parentNode.childNodes.length;i++){ 
+            if(Object.is(searchNode.parentNode.childNodes[i],searchNode)){
+              childNodePath.push(`:nth-child(${i+1})`);
+            }
+          }
+          searchNode = searchNode.parentNode;
+        }
+
+        childNodePath = childNodePath.reverse();
+        node.attributes.removeNamedItem(signal.signalPath);
+        signal.signalPath = childNodePath.join(" ");
+      }
+    });
 
     //Tenplate parsing needs to be optimized for performance.
     //This is to display the overhead of the current logic.
@@ -340,8 +370,6 @@ class PresentationComponent {
       eventItem = eventItem.parentNode;
     }
     
-    console.log(eventItem);
-    console.log(depth);
     return eventItem.id;
   }
 
@@ -389,20 +417,16 @@ class PresentationItem {
     return computedPropValues;
   }
   
-  createTemplateNode(){
-
-  
+  createTemplateNode(){ 
     return PresentationComponent
       .presentationComponents[this.templateName]
       .templateNode
       .cloneNode(true)
-  }
-      
+  } 
 }
 
 class ContainerComponent extends HTMLElement {
 
-  //TODO: Remove variables here that aren't being used. 
   #componentIsRendering = false;
   #loadingFromStores = new Set();
   #loadingStarted = 0;
@@ -420,9 +444,6 @@ class ContainerComponent extends HTMLElement {
   //HTML before loading animiation.
   #htmlBeforeLoading;
 
-  //prevState = {};
-  //static computedProps = {};
-  //static prevOrdering = {};
 
   static templateCount = 0;
   static changeTemplateEvents = {};
@@ -430,7 +451,6 @@ class ContainerComponent extends HTMLElement {
 
   static changeTemplateItemHandlers = {};
   static clickTemplateItemHandlers = {};
-
 
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
@@ -474,7 +494,8 @@ class ContainerComponent extends HTMLElement {
 			fieldName,
 			attr,
 			isOuter,
-			signalId
+			signalId,
+      signalPath
 		} = params.signalConfig
     
 		const{ 
@@ -483,18 +504,13 @@ class ContainerComponent extends HTMLElement {
 		} = params.updateData;
     
     let updated = signalData[fieldName];  
-    let element;
-
-    if(isOuter){
-      element = elementRoot;
-    }
-    else {    
-      console.log("root");
-      console.log(signalId);
-      element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
-    }
-
+    let element = elementRoot;
     
+    if(!isOuter){       
+      element=element.querySelector(signalPath);
+    }
+
+    //TODO: Consider removing this line.
     if(updated === '') {
       element.removeAttribute(attr);
     }
@@ -550,7 +566,7 @@ class ContainerComponent extends HTMLElement {
   disconnectedCallback(){
 
     for(let i = 0; i < this.#subscribedStores.length; i++){
-      //this.#subscribedStores[i].dataStore.unsubscribeComponent(this);
+      this.#subscribedStores[i].dataStore.unsubscribeComponent(this);
     }
   }
 
@@ -985,7 +1001,8 @@ class ContainerComponent extends HTMLElement {
 
         const presentationConfig = PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()];
 
-        if(presentationConfig.changeTemplateEvents){
+
+        if(presentationConfig?.changeTemplateEvents){
           document.getElementById(templateId.id)
             .addEventListener("change",(e)=>{
 
@@ -1009,7 +1026,7 @@ class ContainerComponent extends HTMLElement {
           });
         }
        
-                if(presentationConfig.clickTemplateEvents){
+        if(presentationConfig?.clickTemplateEvents){
           document.getElementById(templateId.id)
             .addEventListener("click",(e)=>{
  
