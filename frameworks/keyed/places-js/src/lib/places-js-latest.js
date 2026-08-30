@@ -183,8 +183,6 @@ class PresentationComponent {
       templateStr = changeEventsStr.join("");
     }
 
-
-
     this.changeTemplateEvents = changeEvents;
     this.clickTemplateEvents = clickEvents;
 
@@ -297,7 +295,6 @@ class PresentationComponent {
       }
     }
     templateStr = linesToAdd.join("");
-
     template.innerHTML = templateStr;
     
     this.templateNode = template.content.firstChild;
@@ -355,10 +352,21 @@ class PresentationItem {
   }
   
   createTemplateNode(){
+
+    const potatoNode = PresentationComponent
+      .presentationComponents[this.templateName]
+      .templateNode;
+
+
+    potatoNode.potato = ()=>{
+      console.log(this);
+      console.log("Hi");
+    }
+
     return PresentationComponent
       .presentationComponents[this.templateName]
       .templateNode
-      .cloneNode(true)
+      .cloneNode(false)
   }
       
 }
@@ -387,6 +395,7 @@ class ContainerComponent extends HTMLElement {
   //static computedProps = {};
   //static prevOrdering = {};
 
+  static templateCount = 0;
   static changeTemplateEvents = {};
   static clickTemplateEvents = {};
 
@@ -453,10 +462,12 @@ class ContainerComponent extends HTMLElement {
     else {    
       element = elementRoot.querySelector(`[data-signal-id-${signalId}]`);
     }
- 
+
+    
     if(updated === '') {
       element.removeAttribute(attr);
     }
+    
     else {
       if (attr === "innerHTML"){
         element.textContent = updated;
@@ -506,8 +517,9 @@ class ContainerComponent extends HTMLElement {
 	 * Unsubscribe component when it is removed from the UI.
 	 **/
   disconnectedCallback(){
+
     for(let i = 0; i < this.#subscribedStores.length; i++){
-      this.#subscribedStores[i].dataStore.unsubscribeComponent(this);
+      //this.#subscribedStores[i].dataStore.unsubscribeComponent(this);
     }
   }
 
@@ -584,12 +596,7 @@ class ContainerComponent extends HTMLElement {
       });
 
       const stateSlice = (state)=>{return state};
-      this.#setupTemplateEventListeners(
-        elementRoot,
-        stateSlice,
-        templateName  
-      );
-
+      
     } else {
 
       elementRoot = document.getElementById(presentationItem.id);
@@ -620,65 +627,6 @@ class ContainerComponent extends HTMLElement {
     }
    
     presentationItem.prevState = computedPropValues; 
-  }
-
-  #setupEventListeners(
-    addNode,
-    eventType,
-    stateSlice,
-    templateName
-  ){
-
-    const eventFieldName = `${eventType}TemplateEvents` 
-    const defineName = `${eventType}Handlers`;
-
-    let events = [];
-    let templateFunctions;
-    const presentationComponent = PresentationComponent.presentationComponents[templateName];
-
-    if(presentationComponent[eventFieldName]){
-      events = presentationComponent[eventFieldName];
-
-      if(events.length > 0) { 
-        templateFunctions = presentationComponent[defineName]();
-      }
-    }
-    
-    if(events && events.length > 0){
-      for(let i=0;i<events.length;i++){
-
-        const oldEventName = `data-${eventType}-id-${i}`;
-        const elem = addNode.querySelector(`[${oldEventName}]`); 
-        
-        elem.removeAttribute(oldEventName);
-
-        const newAttr = `data-${eventType}-id`;     
-        const countVar = `${eventType}HandlerCount`;
-             
-        const eventHandlerId = ContainerComponent[countVar];
-        elem.setAttribute(newAttr,eventHandlerId);
-      
-        const handlerFieldName = `${eventType}TemplateItemHandlers`;
-
-        ContainerComponent[handlerFieldName][eventHandlerId] = {
-          "presentationId":addNode.id ?? "",
-          "stateSlice":stateSlice,
-          "templateName":templateName,
-          "templateFunction":templateFunctions[events[i]],
-        }
-        
-        ContainerComponent[countVar]++; 
-      }
-    }
-  }
-  
-  #setupTemplateEventListeners(
-    addNode,
-    stateSlice,
-    templateName  
-  ){
-    this.#setupEventListeners(addNode,"click",stateSlice,templateName);
-    this.#setupEventListeners(addNode,"change",stateSlice,templateName);
   }
  
   #setupTemplate(templateItem){
@@ -742,14 +690,13 @@ class ContainerComponent extends HTMLElement {
 				this.#templateLoaded = true;
 			}
     }
- 
+
     for(let i = 0; i < this.#presentationItems.length;i++){
 
       const presentationItem = this.#presentationItems[i];
       
       let isArray = false;
       let state = data[presentationItem.dataFieldName] || []; 
-
 
       const attrs = this.#presentationItems[i].attributes; 
       const attrData = [];
@@ -773,8 +720,7 @@ class ContainerComponent extends HTMLElement {
         continue;
       }
     
-      const prevStateLen = this.#presentationItems[i].prevStateLen();
-    
+      const prevStateLen = this.#presentationItems[i].prevStateLen();    
       const updatedOrdering = [];
       
       const prevIds = new Set();
@@ -831,7 +777,8 @@ class ContainerComponent extends HTMLElement {
             const signalsToRun = presentationComponent.templateSignals;
 
             let addNode = presentationItem.createTemplateNode();
-						const signalData =  {...computedProps,...itemState}
+	
+            const signalData =  {...computedProps,...itemState}
 
 						signalsToRun.forEach((signal)=>{ 	
               this.#generateSignal(
@@ -848,15 +795,6 @@ class ContainerComponent extends HTMLElement {
 						addNode.id = signalData.id;           
             presentationItem.prevState[updateData] = computedProps;
  
-            const stateSlice = () =>{
-              return presentationItem.prevState[updateData];
-            }
-           
-            this.#setupTemplateEventListeners(
-              addNode,
-              stateSlice,
-              presentationItem.templateName
-            );
             addFragment.appendChild(addNode);
           }else {
             if(addFragment !== null){
@@ -875,7 +813,7 @@ class ContainerComponent extends HTMLElement {
             add.replaceChildren(addFragment); 
             lastNode.parentNode.appendChild(add);
           } else{
-							this.getRootNode()
+							document
 								.getElementById(presentationItem.id)
 								.replaceChildren(addFragment);
 								hasReplaced = true;
@@ -887,8 +825,7 @@ class ContainerComponent extends HTMLElement {
       if(removed.size > 0) { 
 				if(removed.size === prevIds.size && !hasReplaced){
 
-          const templateElem = this.getRootNode()
-              .getElementById(presentationItem.id)
+          const templateElem = document.getElementById(presentationItem.id)
           templateElem.replaceChildren([]);
           
 					break; 
@@ -1016,7 +953,7 @@ class ContainerComponent extends HTMLElement {
         const changeHandlers = ContainerComponent.changeTemplateEvents[templateId.templateName.toUpperCase()]
 
         if(PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()].changeTemplateEvents){
-          this.getRootNode().getElementById(templateId.id)
+          document.getElementById(templateId.id)
             .addEventListener("change",(e)=>{
 
               const id = e.target.getAttribute("data-change-id") || 
@@ -1034,24 +971,22 @@ class ContainerComponent extends HTMLElement {
         }
         
         if(PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()].clickTemplateEvents){
-          this.getRootNode().getElementById(templateId.id)
+          document.getElementById(templateId.id)
             .addEventListener("click",(e)=>{
               const id = e.target.getAttribute("data-click-id")
                       || e.target.parentNode.getAttribute("data-click-id") 
                       || e.target.parentNode.parentNode.getAttribute("data-click-id") 
 
-              if(id !== null) {
+              //TODO: replace with non hardcoded call;
 
-                e.preventDefault(); 
-                const handlerConfig = ContainerComponent.clickTemplateItemHandlers[id]
-                    
-                handlerConfig.templateFunction({
-                  "event":e,
-                  "containerAttrs":this.attributes,
-                  "componentState":ContainerComponent.clickTemplateItemHandlers[id].stateSlice(),
-                  "componentId": handlerConfig.presentationId
-                })
-              }
+              const componentId = e.target.parentNode.parentNode.id;
+              
+              const config = PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()];
+
+              config.clickHandlers()["select"]({
+                "componentId":componentId
+              });
+         
           });
         }
           
@@ -1078,7 +1013,9 @@ class ContainerComponent extends HTMLElement {
     const handlerMap = {};
     const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
 
-    this.getRootNode()
+    const root = this.#parentNode;
+   
+    root
       .querySelectorAll(`[${clickSelectorName}]`)
       .forEach((node)=>{
         
@@ -1088,8 +1025,7 @@ class ContainerComponent extends HTMLElement {
         handlerMap[node.id] = this.#clickEventListeners[eventHandlerName];
     });
 
-    this.addEventListener("click",(e)=>{
-
+    root.addEventListener("click",(e)=>{
       const clickId = e.target?.id;
 
       if(handlerMap[clickId]){
@@ -1099,7 +1035,13 @@ class ContainerComponent extends HTMLElement {
     
     this.#clickEventListenersAdded = true;
   }
-  
+ 
+  #parentNode;
+
+  getRootNode(){
+    return this.#parentNode;
+  }
+
   #generateAndSaveHTML(data) {
 
     //Don't re-render static HTML if templates are being used.
@@ -1125,18 +1067,19 @@ class ContainerComponent extends HTMLElement {
             },remainingTime);
           } else {
             const html = this.render(data);
-            this.innerHTML = this.#setupClickListenerMapping(html);
+            this.parentNode.innerHTML = this.#setupClickListenerMapping(html);
             this.#addContainerClickListeners();
           }
         } else {
           const html = this.render(data);
-          this.innerHTML = this.#setupClickListenerMapping(html);
+          this.#parentNode = this.parentNode;
+          this.parentNode.innerHTML = this.#setupClickListenerMapping(html);
           this.#addContainerClickListeners();
         }
       }
       else {
         const html = this.render(data);
-        this.innerHTML = this.#setupClickListenerMapping(html);
+        this.parentNode.innerHTML = this.#setupClickListenerMapping(html);
         this.#addContainerClickListeners();
       }
 
@@ -1144,7 +1087,7 @@ class ContainerComponent extends HTMLElement {
 		} else {
 
       if(this.#htmlBeforeLoading){
-        this.innerHTML = this.#htmlBeforeLoading;  
+        this.parentNode.innerHTML = this.#htmlBeforeLoading;  
       }
 			this.#renderTemplates(data,this);
     }		

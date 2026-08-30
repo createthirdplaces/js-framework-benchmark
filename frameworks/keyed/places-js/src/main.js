@@ -108,6 +108,7 @@ class TableItem extends PresentationComponent {
   clickHandlers() {
     return {
       "select": ({componentId})=>{
+        //document.getElementById(componentId).potato();
         store.select(componentId);
       },
       "delete":({componentId})=>{
@@ -130,13 +131,12 @@ class TableItem extends PresentationComponent {
   defineTemplate(){ 
     return `
       <tr id={{id}} class={{selected}}>
-        <td class="col-md-1">
-          {{id}}
-        </td>
+        <td class="col-md-1" textContent={{id}}/>
         <td class="col-md-4">
-          <a onClick={{select}}>
-            {{label}}
-          </a>
+          <a 
+            onClick={{select}} 
+            textContent={{label}}
+          />
         </td>
         <td class="col-md-1">
           <a>
