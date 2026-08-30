@@ -6,8 +6,40 @@ function _random(max) {
 
 class Store extends DataStore {
 
-   id=1;
-   buildData(count = 1000) {
+  id=1;
+
+  constructor(loadAction){
+    super(loadAction);
+    
+    const presentationSignals = {
+      "selected": {
+        "update":(({prevState,newState,componentUpdate})=>{
+
+          return [
+            {
+              "id":prevState,
+              "selected": ""
+            },
+            {
+              "id":newState,
+              "selected": "danger"
+            }
+          ]
+        }),
+        "presentationField":"data"
+      },
+      "data": {
+        "update": [
+          "label"
+        ]
+      }
+    }
+    
+    this.setupPresentationSignals(presentationSignals);
+    
+  }
+  
+  buildData(count = 1000) {
         var adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
         var colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
         var nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
@@ -21,6 +53,7 @@ class Store extends DataStore {
         // Just assigning setting each tenth this.data doesn't cause a redraw, the following does:
         var newData = [...this.getStoreData().data];
 
+      
         for (let i = 0; i < newData.length; i += 10) {
             newData[i] = {...newData[i], label:newData[i].label + ' !!!'};
         }
@@ -36,9 +69,9 @@ class Store extends DataStore {
     }
         
     run() {
-        this.updateStoreData({
-          data:this.buildData(),
-        });
+      this.updateStoreData({
+        data:this.buildData(),
+      });
     }
     
     add() {
@@ -99,7 +132,7 @@ const setData = function() {
     selected: undefined,
     id: 1
   }
-}
+};
 
 const store = new Store(new CustomLoadAction(setData));
 
@@ -108,7 +141,6 @@ class TableItem extends PresentationComponent {
   clickHandlers() {
     return {
       "select": ({componentId})=>{
-        //document.getElementById(componentId).potato();
         store.select(componentId);
       },
       "delete":({componentId})=>{
@@ -116,21 +148,10 @@ class TableItem extends PresentationComponent {
       }
     } 
   }
-  
-  defineComputedState() {
-    return { 
-      "label": ({componentState})=>{
-        return componentState.label;
-      },
-      "selected": ({componentState,sharedState})=>{
-        return componentState.id == sharedState.selected ? 'danger' : '';
-      }
-    }
-  }
-  
+   
   defineTemplate(){ 
     return `
-      <tr id={{id}} class={{selected}}>
+      <tr class={{selected}}>
         <td class="col-md-1" textContent={{id}}/>
         <td class="col-md-4">
           <a 

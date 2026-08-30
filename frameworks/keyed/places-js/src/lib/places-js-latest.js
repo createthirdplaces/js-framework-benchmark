@@ -38,7 +38,6 @@ class ApiLoadAction{
   }
 
   static async #getErrorData(response, url) {
-onfig:signal;
 
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -116,14 +115,12 @@ onfig:signal;
   }
 }
 
-
 class PresentationComponent {
  
   static presentationComponents = {};
 
   clickTemplateEvents;
   changeTemplateEvents;
-  computedProps;
  
   dynamicSignals;
   templateSignals;
@@ -131,19 +128,15 @@ class PresentationComponent {
   templateNode;
 
   #handlerDepthMap = {};
-  #signalSelectors = {};
 
   #defineComponent(){
 
-    let computedState = this.defineComputedState() || {};
     let template = document.createElement("template");
     let templateStr = this.defineTemplate();
 
     this.templateSignals = [];
     this.dynamicSignals = [];
-
-    this.computedProps = [];   
-     
+ 
     const clickEvents = [];
     const changeEvents = [];
 
@@ -157,8 +150,7 @@ class PresentationComponent {
      * This logic is running in O(m*n^2) time with repetitive iteration.
      * n is the number of template items and m is the length of the template string.
      * This logic should run in O(m*n) time or better.
-     */
-   
+     */   
     const clickEventsStr = templateStr.split("onClick={{");
     if(clickEventsStr.length > 1){
       for(let i=1;i<clickEventsStr.length;i++){
@@ -241,15 +233,7 @@ class PresentationComponent {
       }
       
       let templateFuncType = "";
-      if(computedState[fieldName]){
-
-        templateFuncType = "function";
-        this.computedProps.push(
-          {
-            "field": fieldName,
-            "func": computedState[fieldName]
-          });
-      }
+     
      
       const signalData = {
         fieldName,
@@ -404,24 +388,11 @@ class PresentationItem {
   setTemplateName(templateName){
     this.templateName = templateName.toUpperCase();
   }
-  
-  computePropValuesForNode(state){
-    let computedPropValues = {};
-
-    PresentationComponent
-      .presentationComponents[this.templateName]
-      .computedProps
-      .forEach((computedConfig)=>{
-        computedPropValues[computedConfig.field] = computedConfig.func(state);
-      });
-    return computedPropValues;
-  }
-  
-  createTemplateNode(){ 
+    
+  getTemplateNode(){ 
     return PresentationComponent
       .presentationComponents[this.templateName]
       .templateNode
-      .cloneNode(true)
   } 
 }
 
@@ -439,6 +410,8 @@ class ContainerComponent extends HTMLElement {
   #subscribedStores = [];
 
   componentStore = {};
+
+  #presentationItems = []
   #templateLoaded = false;
 
   //HTML before loading animiation.
@@ -455,7 +428,6 @@ class ContainerComponent extends HTMLElement {
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
 
-  #presentationItems = [];
 	/**
 	 * @param dataStoreSubscriptions - An array of data stores the component should
 	 * subscribe to.
@@ -487,7 +459,9 @@ class ContainerComponent extends HTMLElement {
   init(initialState){
     this.updateData(initialState);
   }
-  
+ 
+  #selectorCache = {};
+
   #generateSignal(params){
 
 		const {
@@ -503,27 +477,26 @@ class ContainerComponent extends HTMLElement {
       elementRoot
 		} = params.updateData;
     
-    let updated = signalData[fieldName];  
+    let updated = signalData[fieldName] 
     let element = elementRoot;
-   
-
+  
     if(!isOuter){       
-      element=element.querySelector(signalPath);
+      const cacheId = `${elementRoot.id}-${signalId}`;
+
+      if(!(cacheId in this.#selectorCache)){
+        element=element.querySelector(signalPath);
+        this.#selectorCache[cacheId] = element;
+      } else {
+        element = this.#selectorCache[cacheId];
+      }
     }
 
-    //TODO: Consider removing this line.
-    if(updated === '') {
-      element.removeAttribute(attr);
-    }
-    
-    else {
-      if (attr === "innerHTML"){
-        element.textContent = updated;
-      } else if(attr==="textContent"){
-        element.textContent = updated;
-      } else {
-        element.setAttribute(attr,`${updated}`);
-      }
+    if (attr === "textContent"){
+      element.textContent = updated;
+    } else if(attr==="innerHTML"){
+      element.textContent = updated;
+    } else {
+      element.setAttribute(attr,`${updated}`);
     }
   }
 
@@ -534,7 +507,7 @@ class ContainerComponent extends HTMLElement {
   addClickEventListeners(eventListeners){
     this.#clickEventListeners = eventListeners;
   }
-	
+ 
   /**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
 	 * replaces UI components and disables any user events.
@@ -582,6 +555,8 @@ class ContainerComponent extends HTMLElement {
       this.#componentIsRendering = false;
     }
   }
+ 
+
   updateFromSubscribedStores() {
 
     let allSubscribedStoresHaveData = true;
@@ -599,7 +574,8 @@ class ContainerComponent extends HTMLElement {
       for(let i =0; i < this.#subscribedStores.length; i++){
 
         const item = this.#subscribedStores[i];
-        let storeData = item.dataStore.getStoreData();
+        let storeData = item.dataStore.getComponentUpdateData();
+
         if(item.componentReducer){
           storeData = item.componentReducer(storeData);
         }
@@ -619,16 +595,13 @@ class ContainerComponent extends HTMLElement {
   #updateSingleItemTemplate(presentationItem,state){
    
     const templateName = presentationItem.templateName;
-
     const prevProps = presentationItem.prevState;
-		const computedPropValues = 
-      presentationItem.computePropValuesForNode(state);
 
     let elementRoot;
 
     if(Object.keys(prevProps).length === 0){
 
-      elementRoot = presentationItem.createTemplateNode();
+      elementRoot = presentationItem.getTemplateNode().cloneNode(true);
       
       const signalsToRun = PresentationComponent.presentationComponents[templateName].templateSignals;
 
@@ -637,7 +610,7 @@ class ContainerComponent extends HTMLElement {
           { 
             signalConfig: signalConfig,
             updateData: {
-              "signalData":computedPropValues,
+              "signalData":state,
               "elementRoot": elementRoot,
             }
           });
@@ -647,7 +620,7 @@ class ContainerComponent extends HTMLElement {
       
     } else {
 
-      elementRoot = document.getElementById(presentationItem.id);
+      elementRoot = this.getRootNode().getElementById(presentationItem.id);
         
       if(!elementRoot){
         console.error("No id set for template");
@@ -657,24 +630,20 @@ class ContainerComponent extends HTMLElement {
     const signalsToRun = PresentationComponent.presentationComponents[templateName].dynamicSignals;
 
 		signalsToRun.forEach((signalConfig)=>{
-		  if(prevProps[signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
 			
-          this.#generateSignal(
-            { 
-              signalConfig: signalConfig,
-              updateData: {
-                "signalData":computedPropValues,
-                "elementRoot": elementRoot
-              }
-            });	
-				}
+      this.#generateSignal(
+        { 
+          signalConfig: signalConfig,
+          updateData: {
+            "signalData":state,
+            "elementRoot": elementRoot
+          }
+        });	
     });
 
     if(Object.keys(prevProps).length === 0){
       document.getElementById(presentationItem.id).replaceChildren(elementRoot);
-    }
-   
-    presentationItem.prevState = computedPropValues; 
+    }  
   }
  
   #setupTemplate(templateItem){
@@ -741,255 +710,164 @@ class ContainerComponent extends HTMLElement {
 
     for(let i = 0; i < this.#presentationItems.length;i++){
 
-      const presentationItem = this.#presentationItems[i];
+      const presentationItem = this.#presentationItems[i]; 
+      const presentationComponent = PresentationComponent.presentationComponents[presentationItem.templateName];
       
-      let isArray = false;
       let state = data[presentationItem.dataFieldName] || []; 
 
-      const attrs = this.#presentationItems[i].attributes; 
-      const attrData = [];
-      for(let j=0;j<attrs.length;j++){
-        if(attrs[j].value.startsWith("data")){
-          const itemKey = attrs[j].value.split('.')[1];
-
-          attrData.push({
-            "name":attrs[j].name,
-            "itemKey":itemKey
-          });
-        }
-        if(attrs[j].name === "data-repeat"){
-          isArray = true;
-        }
-      }
-  
       //template is a single item.
-      if(!isArray){ 
-        this.#updateSingleItemTemplate(this.#presentationItems[i], data);  
+      
+      if(data?.fieldTypeMapping?.[presentationItem.dataFieldName] === "item"){ 
+        this.#updateSingleItemTemplate(this.#presentationItems[i],data);  
         continue;
       }
-    
-      const prevStateLen = this.#presentationItems[i].prevStateLen();    
-      const updatedOrdering = [];
+
+      let hasReplaced = false;
+      const added = data["added"] ?? [];
+      let shouldReplace = data["isReplace"];
+
+      const templateRoot = document.getElementById(presentationItem.id);
       
-      const prevIds = new Set();
-      const newIds = new Set();
+      if(added.length >0){
 
-			let sameLocs = true;
-      for(let num=0;num<Math.max(state.length,prevStateLen);num++){
-        if(num<state.length){
-          updatedOrdering.push(state[num].id);
-          newIds.add(state[num].id);
-        }
-        if(num < prevStateLen){
-          prevIds.add(this.#presentationItems[i].prevOrdering[num]);
-        }
-        if(!state[num] || state[num].id !== presentationItem.prevOrdering[num]){
-          sameLocs = false; 
-        }
-      }
-   
-      const presentationComponent = PresentationComponent.presentationComponents[presentationItem.templateName];
-
-      const removed = sameLocs ? new Set() : prevIds.difference(newIds);
-      const added = sameLocs ? new Set() : newIds.difference(prevIds);
-      let hasReplaced = (removed.size === prevIds.size && removed.size === added.size);
-      if(added.size > 0){
-
-        const lastId = presentationItem
-          .prevOrdering[prevStateLen-1];
+        const signalsToRun = presentationComponent.templateSignals;
         
-				const sharedData = {};
-				for(let j=0;j<attrData.length;j++){
-					sharedData[attrData[j].name]= data[attrData[j].itemKey];
-				}
+        if(!presentationItem.signalMapCache){
+          presentationItem.signalMapCache = {};
 
-				let addFragment = null; 
-        for(let num = 0; num < updatedOrdering.length; num++){
-          const updateData = updatedOrdering[num]; 
-        
-          if(added.has(updateData)){
-            if(addFragment === null){
-              addFragment = document.createDocumentFragment();
-            }
-           
-            const itemState = state[num];        
-						const computedProps = {}; 
-            presentationComponent.computedProps.forEach((computedConfig)=>{
-              computedProps[computedConfig.field]
-                = computedConfig.func({
-                  "componentState":itemState,
-                  "sharedState":sharedData
-                });
-            });
-            
-            const signalsToRun = presentationComponent.templateSignals;
+          for(let i=0;i<signalsToRun.length;i++){
+            presentationItem.signalMapCache[signalsToRun[i].fieldName] =
+              signalsToRun[i];
+          }
+        }
 
-            let addNode = presentationItem.createTemplateNode();
-	
-            const signalData =  {...computedProps,...itemState}
+        const templateNode = presentationItem.getTemplateNode();
+        for(let j=0;j<added.length;j++){
 
-						signalsToRun.forEach((signal)=>{ 	
+          const insertBefore = added[j].insertBefore;
+          const insertData = added[j].insertData;
+
+          let addFragment = document.createDocumentFragment();
+          
+          for(let k=0;k<insertData.length;k++){
+            const addNode = templateNode.cloneNode(true);          
+            addNode.id = insertData[k].id;
+ 
+            const fieldNames = Object.keys(insertData[k]);
+            for(let a=0;a<fieldNames.length;a++){
+                 
               this.#generateSignal(
-								{
-									signalConfig:signal,
-									updateData:{
-										"signalData":signalData,
-										"elementRoot":addNode,
-									}
-								}
-							);
-            })
-						
-						addNode.id = signalData.id;           
-            presentationItem.prevState[updateData] = computedProps;
+                {
+                  signalConfig:presentationItem.signalMapCache[fieldNames[a]],
+                  updateData:{
+                    "signalData":insertData[k],
+                    "elementRoot":addNode,
+                  }
+                }
+              )
+            }
  
             addFragment.appendChild(addNode);
-          }else {
-            if(addFragment !== null){
-              const curNode = this.getRootNode().getElementById(""+updateData); 
-							curNode.parentNode.insertBefore(addFragment,curNode); 
-              addFragment = null;
-            }
           }
-        }
-     
-        if(addFragment !== null){
 
-          if(added.size < newIds.size - removed.size) { 
-            const lastNode = this.getRootNode().getElementById(""+lastId);
-            const add = document.createDocumentFragment();
-            add.replaceChildren(addFragment); 
-            lastNode.parentNode.appendChild(add);
-          } else{
-							document
-								.getElementById(presentationItem.id)
-								.replaceChildren(addFragment);
-								hasReplaced = true;
-          }          
-        }
-        presentationItem.prevOrdering = updatedOrdering;
-      }
-
-      if(removed.size > 0) { 
-				if(removed.size === prevIds.size && !hasReplaced){
-
-          const templateElem = document.getElementById(presentationItem.id)
-          templateElem.replaceChildren([]);
-          
-					break; 
-        }
-
-        removed.forEach((id)=>{
-          delete presentationItem.prevState[id] 
-        });
-
-        if(!hasReplaced){ 
-          if(newIds.size > 0) {
-            const self = this;
-            removed.forEach((id)=>{ 
-							const searchId = `[id="${id}"]`;
-              const node = self.querySelector(searchId);
-							node.parentNode.removeChild(node);
-              const idx = presentationItem.prevOrdering.findIndex((elem)=>elem === id);
-              presentationItem.prevOrdering.splice(idx,1); 
-            });
-          } 
-        }
-      }
-
-      let sameNumber = false;
-      if(!hasReplaced && updatedOrdering.length === presentationItem.prevOrdering.length){
-        sameNumber = true; 
-        let moveNodes = [];
-        for(let num=0;num<updatedOrdering.length;num++){
-          if(updatedOrdering[num] !== presentationItem.prevOrdering[num]){
-          
-            let insertBefore = null;
-            if (num < updatedOrdering.length -1){
-             
-              insertBefore = this.getRootNode().getElementById(
-                ""+updatedOrdering[num+1]);
-            }
-            moveNodes.push({
-              moveId:updatedOrdering[num],
-              prevNode:insertBefore
-            }); 
-          }
-        }
-        
-        if(moveNodes.length > 0){
-          for(let mNum=moveNodes.length-1;mNum>=0;mNum--){
-           
-            const moveData = moveNodes[mNum];
-            const nodeToMove = this.getRootNode().getElementById(
-              moveData.moveId);
-          
-            if(moveData.prevNode !== null){
-              moveData.prevNode.parentNode.insertBefore(nodeToMove,moveData.prevNode);
+          if(insertBefore !== -1){
+            const lastNode = document.getElementById(""+insertBefore);
+            lastNode.parentNode.insertBefore(addFragment);
+          } else {
+            if(!shouldReplace){
+              templateRoot.appendChild(addFragment);
             } else {
-              nodeToMove.parentNode.appendChild(nodeToMove);
+              templateRoot.appendChild(addFragment);
+              shouldReplace = false;
+              hasReplaced = true;
             }
           }
         }
-        presentationItem.prevOrdering = updatedOrdering;
       }
-    	
-      if(hasReplaced){
-        break;
-      }
+                
+      const removed = data["removed"];
 
-      if(sameNumber){
-				let start = Date.now();
-      	
-					const sharedData = {};
-					for(let j=0;j<attrData.length;j++){
-						sharedData[attrData[j].name]= data[attrData[j].itemKey];
-					}
+      if(removed && removed.size > 0) { 
 
-					for(let num=0;num<state.length;num++){
-         
-            const id = state[num].id;
-            const itemState = state[num];        
-           
-            const prevProps = presentationItem.prevState[""+id]                   
-						const computedPropValues = {}; 
-						
-            //Calculate computed values.
-            const componentConfig = PresentationComponent
-              .presentationComponents[presentationItem.templateName]
-
-            componentConfig
-              .computedProps
-              .forEach((computedConfig)=>{
-
-                computedPropValues[computedConfig.field] = 
-                  computedConfig.func({ 
-                    "componentState":itemState,
-                    "sharedState":sharedData
-                  })
-            });
-                  
-            let updatedNode;
-						
-            componentConfig.dynamicSignals.forEach((signalConfig)=>{
-							if(presentationItem.prevState[id][signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
-							
-								this.#generateSignal(
-									{ 
-										signalConfig: signalConfig,
-										updateData: {
-											"signalData":computedPropValues,
-											"elementRoot": document.getElementById(""+id),
-										}
-									}
-								);
-							}
-
-						});
-						
-				  presentationItem.prevState[id] = computedPropValues;
+				if(data["isClear"] && !hasReplaced){
+          templateRoot.replaceChildren([]);
+					continue;
         }
-      }	
+ 
+        removed.forEach((id)=>{ 
+          const searchId = `[id="${id}"]`;
+          const node = templateRoot.querySelector(searchId);
+          node.parentNode.removeChild(node);
+        });
+      }
+
+      const moved = data["moved"] || [];
+
+      for(let m=0;m<moved.length;m++){
+        const moveNodeId = moved[m].moveNodeId;
+        const moveBeforeId = moved[m].moveBeforeId;
+
+        console.log(moveNodeId+":"+moveBeforeId);
+        const nodeToMove = templateRoot.querySelector(`[id="${moveNodeId}"]`);
+          
+        if(moveBeforeId !== null){
+          
+          const moveBefore = templateRoot.querySelector(`[id="${moveBeforeId}"]`);
+
+          moveBefore
+            .parentNode
+            .insertBefore(nodeToMove,moveBefore);
+        } else { 
+          nodeToMove.parentNode.appendChild(nodeToMove);
+        }  
+      }
+ 
+      const updates = data?.updates?.[presentationItem.dataFieldName];
+
+      if(!updates){
+        continue;
+      }
+
+      const componentConfig = PresentationComponent
+          .presentationComponents[presentationItem.templateName]
+
+      const templateSignals = componentConfig.templateSignals;
+      
+      if(!presentationItem.signalMapCache){
+        presentationItem.signalMapCache = {};
+
+        for(let i=0;i<templateSignals.length;i++){
+          presentationItem.signalMapCache[templateSignals[i].fieldName] =
+            templateSignals[i];
+        }
+      }
+
+      for(let i=0;i<updates.length;i++){
+
+        let attrName,attrValue,id;
+
+        Object.keys(updates[i]).forEach((key)=>{
+            if(key === "id"){
+              id = updates[i][key];
+            } else {
+              attrName = key;
+              attrValue = updates[i][key];
+            }
+        });
+      
+        if(id){
+         
+          const updateConfig = { 
+              signalConfig: presentationItem.signalMapCache[attrName],
+              updateData: {
+                "signalData":{[attrName]:attrValue},
+                "elementRoot": templateRoot.querySelector(`[id="${id}"]`)
+              }
+            }
+          
+          this.#generateSignal(updateConfig);
+        } 
+      }
     }
   }
  
@@ -1178,23 +1056,132 @@ class DataStore {
   #componentSubscriptions = [];
   #isLoading = false; 
   #loadAction;
+  #presentationUpdates = {};
+  #presentationSignals = [];
+  #reactiveFieldNames = [];
   #requestStoreId;
   #storeData = null;
 
+
+  #prevOrdering = {};
+  #fieldTypeMapping = {};
+  
   constructor(loadAction) {
     this.#loadAction = loadAction;
     this.#componentSubscriptions = [];
     this.#requestStoreId = `store-${DataStore.#storeCount}`;
     
-	sessionStorage.setItem(this.#requestStoreId, JSON.stringify({}));
+	  sessionStorage.setItem(this.#requestStoreId, JSON.stringify({}));
     DataStore.#storeCount++;
+
   }
 
   /**
-   * Returns data from the store.
-   * @returns A JSON object representing an immutable copy of store data.
+   * Setup signals to enable fine-grained reactivity on
+   * presentation components.
    */
-  getStoreData() {
+  setupPresentationSignals(presentationSignals){
+    this.#presentationSignals = presentationSignals;
+  } 
+
+  #generatePresentationUpdates(updates){
+
+    const presentationUpdates = {}; 
+
+    const keys = Object.keys(this.#presentationSignals);
+    for(let i=0;i<keys.length;i++){
+
+      const key = keys[i];
+
+      const presentationField 
+        = this.#presentationSignals[key]["presentationField"] || key;
+      const dataToUpdate = this.#storeData[presentationField];
+
+      if(Array.isArray(dataToUpdate)){ 
+        presentationUpdates[presentationField] = {};
+      } else {
+        presentationUpdates[presentationField] = "";
+      }
+    }
+  
+    const signalKeys = Object.keys(this.#presentationSignals);
+    for(let i=0; i<signalKeys.length;i++){
+     
+      const stateField = signalKeys[i]; 
+      const {update,presentationField} = this.#presentationSignals[stateField];
+
+      if(!updates[stateField]){
+        continue;
+      }
+      if(!Array.isArray(update)){
+        let changeData;
+
+        
+        if(update){
+          changeData = update({
+            "prevState":this.#storeData[stateField],
+            "newState": updates[stateField]
+          });
+        } else {
+          changeData = {
+            param: updates[stateField]
+          }
+        }
+
+        const dataToUpdate = this.#storeData[presentationField];
+
+        if(Array.isArray(dataToUpdate)){
+          for(let j=0;j<changeData.length;j++){
+            const id = changeData[j].id;
+            const updateVal = changeData[j].param;
+            if(!presentationUpdates[presentationField][id]){
+              presentationUpdates[presentationField][id] = {}; 
+            }
+            presentationUpdates[presentationField][id][presentationField] = updateVal;
+          }
+          presentationUpdates[presentationField] = changeData;
+        } 
+        else {
+          presentationUpdates[presentationField] = changeData[param];
+        }
+      }
+
+      else {
+
+        let changeData = [];
+
+        for(let i=0;i<updates[stateField].length;i++){
+
+          const updateData = updates[stateField][i];
+          const id = updateData.id;          
+          const reactiveFields = this.#presentationSignals[stateField]["update"];
+         
+          for(let j=0;j<reactiveFields.length;j++){
+            changeData.push({
+              "id":id,
+              [reactiveFields[j]]:updateData[`${reactiveFields[j]}`]
+            });
+          }
+        }
+        presentationUpdates[stateField] = changeData;
+      }
+    }
+
+    return presentationUpdates;
+  }
+
+  /** 
+   * Returns store data.
+   * @returns A JSON object representing store data.
+   */
+  getStoreData() {  
+    return this.#storeData; 
+  }
+
+  getComponentUpdateData(){
+    if(this.#presentationSignals){
+      return this.#presentationUpdates;
+    }
     return this.#storeData;
   }
 
@@ -1204,16 +1191,168 @@ class DataStore {
   hasLatestData() {
     return this.#storeData !== null && this.#storeData !== undefined  && !this.#isLoading;
   }
-
+  
   /**
    * Update data in the store and trigger a render of components subscribed to the store.
    * @param storeUpdates Updated store data. Fields not specified in storeData will not be updated.
    */
   updateStoreData(storeUpdates){
-    this.#storeData = {...this.#storeData,...storeUpdates};
+
+
+    //Logic that should only run if reactivity is not enabled for store
+    if(!this.#presentationSignals){
+      for(let i = 0; i < this.#componentSubscriptions.length; i++){
+        this.#componentSubscriptions[i].updateFromSubscribedStores();
+      }
+      return;
+    }
+
+    let changeData = {}; 
+ 
+    this.#presentationUpdates["removed"] = null;
+    this.#presentationUpdates["added"] = null;
+    this.#presentationUpdates["moved"] = null;
+    this.#presentationUpdates["updated"] = null;
+    this.#presentationUpdates["isClear"] = null;
+    this.#presentationUpdates["isReplace"] = null;
+    
+    Object.keys(storeUpdates).forEach((field)=>{
+           
+      if(Array.isArray(storeUpdates[field])){
+        
+        this.#fieldTypeMapping[field] = "array";
+
+        const dataItem = storeUpdates[field]; 
+        const dataItemOld = this.#prevOrdering[field] ||[] ;
+       
+        const updatedOrdering = [];
+      
+        const prevIds = new Set();
+        const newIds = new Set();
+
+        let sameLocs = true;
+        for(let num=0;num<Math.max(dataItem.length,dataItemOld.length);num++){
+          if(num<dataItem.length){
+            updatedOrdering.push(dataItem[num].id);
+            newIds.add(dataItem[num].id);
+          }
+          if(num < dataItemOld.length){
+            prevIds.add(dataItemOld[num]);
+          }
+          if(!dataItem[num] || dataItem[num].id !==dataItemOld[num]){
+            sameLocs = false; 
+          }
+        }
+       
+        let isReplace = false;
+        this.#presentationUpdates["removed"] = sameLocs ? new Set(): prevIds.difference(newIds);
+        const added = sameLocs ? new Set(): newIds.difference(prevIds);
+        
+        if(added.size > 0){
+          
+          let addFragments = [];
+          let addFragment = null;
+
+          for(let num=0; num < updatedOrdering.length; num++){
+            const id = updatedOrdering[num];
+
+            if(added.has(id)){
+              if(addFragment === null){
+                addFragment = [];
+              }
+              addFragment.push(dataItem[num]);
+            } else {
+
+              if(addFragment !== null){
+                addFragments.push({
+                  "insertBefore":num,
+                  "insertData":addFragment
+                })
+                addFragment = null;
+              }
+            }
+          }
+          if(addFragment !== null){
+              addFragments.push({
+                "insertBefore": -1,
+                "insertData":addFragment,
+            })
+            isReplace = true;
+          } 
+          this.#presentationUpdates["added"] = addFragments;
+        }
+
+        this.#presentationUpdates["isReplace"] = isReplace;
+        this.#presentationUpdates["moved"] = [];
+        
+        if(!updatedOrdering || updatedOrdering.length === 0){
+          this.#presentationUpdates["isClear"] = true;
+        }
+        
+
+        let sameNumber = false;
+        if(!isReplace && updatedOrdering.length === this.#prevOrdering[field].length){
+          sameNumber = true;
+          for(let num=0;num<updatedOrdering.length;num++){
+
+            if(updatedOrdering[num] !== this.#prevOrdering[field][num]){
+
+              let insertBefore = null;
+              if (num < updatedOrdering.length -1){
+                insertBefore = updatedOrdering[num+1];
+              }
+              this.#presentationUpdates["moved"].push({
+                moveNodeId:updatedOrdering[num],
+                moveBeforeId:insertBefore
+              });
+            }
+          }
+        }
+
+        this.#prevOrdering[field] = updatedOrdering;
+        if(sameNumber){
+         
+          const arrayChanges = [];
+          const reactiveFields = this.#presentationSignals[field]["update"];
+
+          for(let i=0;i<storeUpdates[field].length;i++){
+
+            let hasChanged = false;
+            for(let j=0;j<reactiveFields.length;j++){
+              const reactiveName = reactiveFields[j];
+              
+              const oldState = this.#storeData[field][i][reactiveName];
+              const newState = storeUpdates[field][i][reactiveName];
+
+              if(oldState !== newState){  
+                hasChanged = true;
+              }
+            }
+
+            if(hasChanged){
+              arrayChanges.push(storeUpdates[field][i]);   
+            }
+          }
+          changeData[field] = arrayChanges;
+        }
+      } else {
+        this.#fieldTypeMapping[field] = "item";
+        changeData[field] = storeUpdates[field];
+      }
+    
+   });
+
+    this.#presentationUpdates["fieldTypeMapping"] = this.#fieldTypeMapping
+    this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
+ 
+    Object.keys(storeUpdates).forEach((field)=>{
+      this.#storeData[field] = storeUpdates[field]
+    });   
+
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
       this.#componentSubscriptions[i].updateFromSubscribedStores();
     }
+ 
   }
 
   getSubscribedComponents(){
