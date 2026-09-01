@@ -438,6 +438,8 @@ class ContainerComponent extends HTMLElement {
   #subscribedStores = [];
 
   componentStore = {};
+
+  #presentationItems = []
   #templateLoaded = false;
 
   //HTML before loading animiation.
@@ -454,7 +456,7 @@ class ContainerComponent extends HTMLElement {
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
 
-  #presentationItems = [];
+  #presentationUpdates = {}
 	/**
 	 * @param dataStoreSubscriptions - An array of data stores the component should
 	 * subscribe to.
@@ -542,7 +544,6 @@ class ContainerComponent extends HTMLElement {
   addClickEventListeners(eventListeners){
     this.#clickEventListeners = eventListeners;
   }
-
  
   /**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
@@ -610,14 +611,19 @@ class ContainerComponent extends HTMLElement {
 
         const item = this.#subscribedStores[i];
         let storeData = item.dataStore.getStoreData();
+
+        let presentationUpdates = item.dataStore.getPresentationUpdates();
+
         if(item.componentReducer){
           storeData = item.componentReducer(storeData);
         }
 
         if(item.fieldName) {
           dataToUpdate[item.fieldName] = storeData;
+          this.#presentationUpdates[item.fieldName] = presentationUpdates;
         } else {
           dataToUpdate = storeData;
+          this.#presentationUpdates = presentationUpdates;
         }
       }
       this.updateData(
@@ -731,7 +737,7 @@ class ContainerComponent extends HTMLElement {
   }
   
   #renderTemplates(data,content) {
-
+ 
     this.#renderTemplates.templateIds = []; 
     if(!this.#presentationItems || Object.keys(this.#presentationItems).length === 0){
 
@@ -949,7 +955,9 @@ class ContainerComponent extends HTMLElement {
 
       if(sameNumber){
 				let start = Date.now();
-      	
+
+        console.log("updating select with:");
+        console.log(this.#presentationUpdates);
 					const sharedData = {};
 					for(let j=0;j<attrData.length;j++){
 						sharedData[attrData[j].name]= data[attrData[j].itemKey];
@@ -1187,17 +1195,20 @@ class DataStore {
   #componentSubscriptions = [];
   #isLoading = false; 
   #loadAction;
+  #presentationUpdates = {};
   #presentationSignals = [];
+  #reactiveFieldNames = [];
   #requestStoreId;
   #storeData = null;
-
+ 
   constructor(loadAction) {
     this.#loadAction = loadAction;
     this.#componentSubscriptions = [];
     this.#requestStoreId = `store-${DataStore.#storeCount}`;
     
-	sessionStorage.setItem(this.#requestStoreId, JSON.stringify({}));
+	  sessionStorage.setItem(this.#requestStoreId, JSON.stringify({}));
     DataStore.#storeCount++;
+
   }
 
 
@@ -1208,88 +1219,94 @@ class DataStore {
   setupPresentationSignals(presentationSignals){
     this.#presentationSignals = presentationSignals;
 
+
     /*
      * TODO: Setup data change observers. They should save changes to pending
      * updates.
      */
-    console.error("Data change observers not setup");
   } 
 
   #generatePresentationUpdates(updates){
 
     const presentationUpdates = {}; 
 
-    for(let i=0;i<this.#presentationSignals.length;i++){
-      updates(presentation 
-      const presentationField = signal["presentationField"];
+    const keys = Object.keys(this.#presentationSignals);
+    for(let i=0;i<keys.length;i++){
 
+      const key = keys[i];
+
+      const presentationField 
+        = this.#presentationSignals[key]["presentationField"] || key;
       const dataToUpdate = this.#storeData[presentationField];
-      if(Array.isArray(dataToUpdate)){
 
-        if(dataToUpdate.length !== presentationSignals[presentationField].length){
-          console.log("Skipping diff checking due to insert or delete"); 
-          break;
-        }
-        updates[presentationField] = [];
+      if(Array.isArray(dataToUpdate)){ 
+        presentationUpdates[presentationField] = {};
       } else {
-        updates[presentationField] = "";
+        presentationUpdates[presentationField] = "";
       }
-
     }
-    
-    for(let i=0; i<this.#presentationSignals.length;i++){
-      const signal = this.#presentationSignals[i];
-      const presentationField = signal["presentationField"];
-      const stateField = signal["stateField"];
-      const update = signal["update"];
+  
+    const signalKeys = Object.keys(this.#presentationSignals);
+    for(let i=0; i<signalKeys.length;i++){
+     
+      const stateField = signalKeys[i]; 
+      const {update,presentationField} = this.#presentationSignals[stateField];
 
-      if(!stateField.includes(".")({
-
+      if(!updates[stateField]){
+        continue;
+      }
+      if(!Array.isArray(update)){
         let changeData;
 
+        
         if(update){
           changeData = update({
             "prevState":this.#storeData[stateField],
-            "newState": newState.storeData[stateField]
+            "newState": updates[stateField]
           });
         } else {
           changeData = {
-            param: newState.storeData[stateField]
+            param: updates[stateField]
           }
         }
 
         const dataToUpdate = this.#storeData[presentationField];
 
         if(Array.isArray(dataToUpdate)){
- 
-          for(let j=0; j < changeData.length; j++){
-            const changeItem = changeData[i]
-
-     
+          for(let j=0;j<changeData.length;j++){
+            const id = changeData[j].id;
+            const updateVal = changeData[j].param;
+            if(!presentationUpdates[presentationField][id]){
+              presentationUpdates[presentationField][id] = {}; 
+            }
+            presentationUpdates[presentationField][id][presentationField] = updateVal;
           }
-        } else {
-          updates[presentationField] = changeData[param];
+          presentationUpdates[presentationField] = changeData;
+        } 
+        else {
+          presentationUpdates[presentationField] = changeData[param];
         }
       }
+
       else {
-        //This case should only be for data that is in an array.
-        const split = stateField.split(".");
-        const keyA = split[0];
-        const keyB = split[1];
 
-        let changeData;
+        let changeData = [];
 
-        for(let i=0;i<newState[keyA].length;i++){
-          if(update) {
-            changeData = update({
-              "prevState": this.#storeData[keyA][i][keyB],
-              "newState": this.#storeData[keyA][i][keyB];
-            });
-          } else {
-              changeData[this.#storeData[keyA]][i][keyB] = 
-                newState[keyA][i][keyB];
+        for(let i=0;i<updates[stateField].length;i++){
+
+          const id = updates[stateField][i].id;
+          if(!presentationUpdates[stateField][id]){
+            presentationUpdates[stateField][id] = {}; 
           }
+        
+          let itemUpdate = {};
+          for(let j=0;j<update.length;j++){
 
+            const updateField = update[j];
+            
+            presentationUpdates[stateField][id][updateField]
+              = updates[stateField][i]; 
+          } 
         }
       }
     }
@@ -1297,11 +1314,12 @@ class DataStore {
   }
 
   /** 
-   * Returns data from the store.
-   * @returns A JSON object representing an immutable copy of store data.
+   * Returns a copy of data from the store.
+   * @returns A JSON object representing store data.
    */
-  getStoreData() {
-    return this.#storeData;
+  getStoreData() {  
+
+    return this.#storeData; 
   }
 
   /**
@@ -1310,19 +1328,69 @@ class DataStore {
   hasLatestData() {
     return this.#storeData !== null && this.#storeData !== undefined  && !this.#isLoading;
   }
+  
 
   /**
    * Update data in the store and trigger a render of components subscribed to the store.
    * @param storeUpdates Updated store data. Fields not specified in storeData will not be updated.
    */
   updateStoreData(storeUpdates){
-    this.#storeData = {...this.#storeData,...storeUpdates};
 
-    const updates = this.#generateUpdates(this.#pendingUpdates)l;
+    let changeData = {};
+    /*
+     * TODO: Add change detection here.
+     */
+    Object.keys(storeUpdates).forEach((field)=>{
+     
+      if(Array.isArray(storeUpdates[field])){
+     
+        if(storeUpdates[field].length === this.#storeData[field].length){
+         
+          const arrayChanges = [];
+          const reactiveFields = this.#presentationSignals[field]["update"];
+
+          for(let i=0;i<storeUpdates[field].length;i++){
+
+            let hasChanged = false;
+            for(let j=0;j<reactiveFields.length;j++){
+              const reactiveName = reactiveFields[j];
+              
+              const oldState = this.#storeData[field][i][reactiveName];
+              const newState = storeUpdates[field][i][reactiveName];
+
+              if(oldState !== newState){
+                
+                hasChanged = true;
+              } else {
+              }
+            }
+
+            if(hasChanged){
+              arrayChanges.push(storeUpdates[field][i]);   
+            }
+          }
+          changeData[field] = arrayChanges;
+        }
+        //TODO: Add detection of adding, removing or modifying nodes later.
+      } else {
+        changeData[field] = storeUpdates[field];
+      }
+    });
+
+    this.#presentationUpdates = this.#generatePresentationUpdates(changeData);
+    
+    Object.keys(storeUpdates).forEach((field)=>{
+      this.#storeData[field] = storeUpdates[field]
+    });
+
+  
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
-      this.#componentSubscriptions[i].updateFromSubscribedStores(updates);
+      this.#componentSubscriptions[i].updateFromSubscribedStores();
     }
-    this.#pendingUpdates = {};
+  }
+
+  getPresentationUpdates(){
+    return this.#presentationUpdates;
   }
 
   getSubscribedComponents(){
@@ -1340,6 +1408,7 @@ class DataStore {
     if(!this.#isLoading) {
       this.#isLoading = true;
 
+      console.log(this.#loadAction);
       const requestConfig = this.#loadAction.getRequestConfig ? this.#loadAction.getRequestConfig(params) : {};
 
       let response = null;

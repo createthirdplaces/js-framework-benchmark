@@ -8,33 +8,35 @@ class Store extends DataStore {
 
   id=1;
 
-  constructor(){
-    super();
-
-    const presentationSignals = [
-      {
-        "stateField":"selected",
+  constructor(loadAction){
+    super(loadAction);
+    
+    const presentationSignals = {
+      "selected": {
         "update":(({prevState,newState,componentUpdate})=>{
 
           return [
             {
               "id":prevState,
-              "param": false
+              "selected": false
             },
             {
               "id":newState,
-              "param": true
+              "selected": true
             }
           ]
-        },
-        "presentationField":data
-      }, {
-        "stateField":"data.label",
-        "presentationField"data
+        }),
+        "presentationField":"data"
+      },
+      "data": {
+        "update": [
+          "label"
+        ]
       }
-    ]
+    }
     
     this.setupPresentationSignals(presentationSignals);
+    
   }
   
   buildData(count = 1000) {
@@ -51,6 +53,7 @@ class Store extends DataStore {
         // Just assigning setting each tenth this.data doesn't cause a redraw, the following does:
         var newData = [...this.getStoreData().data];
 
+      
         for (let i = 0; i < newData.length; i += 10) {
             newData[i] = {...newData[i], label:newData[i].label + ' !!!'};
         }
@@ -66,9 +69,10 @@ class Store extends DataStore {
     }
         
     run() {
-        this.updateStoreData({
-          data:this.buildData(),
-        });
+      console.log("Run"); 
+      this.updateStoreData({
+        data:this.buildData(),
+      });
     }
     
     add() {
@@ -145,10 +149,16 @@ class TableItem extends PresentationComponent {
       }
     } 
   }
+ 
   
   defineComputedState() { 
+    return {
       "selected": ({params})=>{
         return params ? 'danger' : '';
+      },
+      "label":(state)=>{
+        return state.componentState.label;
+        //console.log(state);
       }
     }
   }
