@@ -6,8 +6,38 @@ function _random(max) {
 
 class Store extends DataStore {
 
-   id=1;
-   buildData(count = 1000) {
+  id=1;
+
+  constructor(){
+    super();
+
+    const presentationSignals = [
+      {
+        "stateField":"selected",
+        "update":(({prevState,newState,componentUpdate})=>{
+
+          return [
+            {
+              "id":prevState,
+              "param": false
+            },
+            {
+              "id":newState,
+              "param": true
+            }
+          ]
+        },
+        "presentationField":data
+      }, {
+        "stateField":"data.label",
+        "presentationField"data
+      }
+    ]
+    
+    this.setupPresentationSignals(presentationSignals);
+  }
+  
+  buildData(count = 1000) {
         var adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
         var colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
         var nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
@@ -108,7 +138,6 @@ class TableItem extends PresentationComponent {
   clickHandlers() {
     return {
       "select": ({componentId})=>{
-        //document.getElementById(componentId).potato();
         store.select(componentId);
       },
       "delete":({componentId})=>{
@@ -117,13 +146,9 @@ class TableItem extends PresentationComponent {
     } 
   }
   
-  defineComputedState() {
-    return { 
-      "label": ({componentState})=>{
-        return componentState.label;
-      },
-      "selected": ({componentState,sharedState})=>{
-        return componentState.id == sharedState.selected ? 'danger' : '';
+  defineComputedState() { 
+      "selected": ({params})=>{
+        return params ? 'danger' : '';
       }
     }
   }

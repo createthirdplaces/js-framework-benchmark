@@ -542,7 +542,8 @@ class ContainerComponent extends HTMLElement {
   addClickEventListeners(eventListeners){
     this.#clickEventListeners = eventListeners;
   }
-	
+
+ 
   /**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
 	 * replaces UI components and disables any user events.
@@ -1186,6 +1187,7 @@ class DataStore {
   #componentSubscriptions = [];
   #isLoading = false; 
   #loadAction;
+  #presentationSignals = [];
   #requestStoreId;
   #storeData = null;
 
@@ -1198,7 +1200,103 @@ class DataStore {
     DataStore.#storeCount++;
   }
 
+
   /**
+   * Setup signals to enable fine-grained reactivity on
+   * presentation components.
+   */
+  setupPresentationSignals(presentationSignals){
+    this.#presentationSignals = presentationSignals;
+
+    /*
+     * TODO: Setup data change observers. They should save changes to pending
+     * updates.
+     */
+    console.error("Data change observers not setup");
+  } 
+
+  #generatePresentationUpdates(updates){
+
+    const presentationUpdates = {}; 
+
+    for(let i=0;i<this.#presentationSignals.length;i++){
+      updates(presentation 
+      const presentationField = signal["presentationField"];
+
+      const dataToUpdate = this.#storeData[presentationField];
+      if(Array.isArray(dataToUpdate)){
+
+        if(dataToUpdate.length !== presentationSignals[presentationField].length){
+          console.log("Skipping diff checking due to insert or delete"); 
+          break;
+        }
+        updates[presentationField] = [];
+      } else {
+        updates[presentationField] = "";
+      }
+
+    }
+    
+    for(let i=0; i<this.#presentationSignals.length;i++){
+      const signal = this.#presentationSignals[i];
+      const presentationField = signal["presentationField"];
+      const stateField = signal["stateField"];
+      const update = signal["update"];
+
+      if(!stateField.includes(".")({
+
+        let changeData;
+
+        if(update){
+          changeData = update({
+            "prevState":this.#storeData[stateField],
+            "newState": newState.storeData[stateField]
+          });
+        } else {
+          changeData = {
+            param: newState.storeData[stateField]
+          }
+        }
+
+        const dataToUpdate = this.#storeData[presentationField];
+
+        if(Array.isArray(dataToUpdate)){
+ 
+          for(let j=0; j < changeData.length; j++){
+            const changeItem = changeData[i]
+
+     
+          }
+        } else {
+          updates[presentationField] = changeData[param];
+        }
+      }
+      else {
+        //This case should only be for data that is in an array.
+        const split = stateField.split(".");
+        const keyA = split[0];
+        const keyB = split[1];
+
+        let changeData;
+
+        for(let i=0;i<newState[keyA].length;i++){
+          if(update) {
+            changeData = update({
+              "prevState": this.#storeData[keyA][i][keyB],
+              "newState": this.#storeData[keyA][i][keyB];
+            });
+          } else {
+              changeData[this.#storeData[keyA]][i][keyB] = 
+                newState[keyA][i][keyB];
+          }
+
+        }
+      }
+    }
+    return presentationUpdates;
+  }
+
+  /** 
    * Returns data from the store.
    * @returns A JSON object representing an immutable copy of store data.
    */
@@ -1219,9 +1317,12 @@ class DataStore {
    */
   updateStoreData(storeUpdates){
     this.#storeData = {...this.#storeData,...storeUpdates};
+
+    const updates = this.#generateUpdates(this.#pendingUpdates)l;
     for(let i = 0; i < this.#componentSubscriptions.length; i++){
-      this.#componentSubscriptions[i].updateFromSubscribedStores();
+      this.#componentSubscriptions[i].updateFromSubscribedStores(updates);
     }
+    this.#pendingUpdates = {};
   }
 
   getSubscribedComponents(){
