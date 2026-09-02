@@ -488,11 +488,11 @@ class ContainerComponent extends HTMLElement {
     
     let updated = signalData[fieldName] 
     let element = elementRoot;
-  
-    if(!isOuter){       
-      const cacheId = `${elementRoot.id}-${signalId}`;
 
-      if(!(cacheId in this.#selectorCache) || true){
+    if(!isOuter){       
+      const cacheId = `${elementRoot.data_id}-${signalId}`;
+
+      if(!(cacheId in this.#selectorCache)){
         element=element.querySelector(signalPath);
         this.#selectorCache[cacheId] = element;
       } else {
@@ -760,6 +760,9 @@ class ContainerComponent extends HTMLElement {
           for(let k=0;k<insertData.length;k++){
             const addNode = templateNode.cloneNode(true);          
 
+
+            addNode.data_id = insertData[k].id;
+            
             presentationItem.addNode(insertData[k].id,addNode);
             const fieldNames = Object.keys(insertData[k]);
             for(let a=0;a<fieldNames.length;a++){
@@ -775,7 +778,6 @@ class ContainerComponent extends HTMLElement {
               )
             }
 
-            addNode.data_id = insertData[k].id;
             addFragment.appendChild(addNode);
           }
 
@@ -802,7 +804,7 @@ class ContainerComponent extends HTMLElement {
           presentationItem.templateRoot.replaceChildren([]);
 					continue;
         }
- 
+
         removed.forEach((id)=>{ 
           presentationItem.templateRoot.removeChild(presentationItem.getNode(id));
         });
@@ -852,6 +854,7 @@ class ContainerComponent extends HTMLElement {
 
         let attrName,attrValue,id;
 
+      
         Object.keys(updates[i]).forEach((key)=>{
             if(key === "id"){
               id = updates[i][key];
@@ -860,9 +863,9 @@ class ContainerComponent extends HTMLElement {
               attrValue = updates[i][key];
             }
         });
-      
+     
         if(id){
-        
+ 
           const updateConfig = { 
               signalConfig: presentationItem.signalMapCache[attrName],
               updateData: {
@@ -870,7 +873,7 @@ class ContainerComponent extends HTMLElement {
                 "elementRoot": presentationItem.getNode(id)
               }
             }
-          
+         
           this.#generateSignal(updateConfig);
         } 
       }
@@ -1252,6 +1255,7 @@ class DataStore {
        
         let isReplace = false;
         this.#presentationUpdates["removed"] = sameLocs ? new Set(): prevIds.difference(newIds);
+        
         const added = sameLocs ? new Set(): newIds.difference(prevIds);
         
         if(added.size > 0){
@@ -1286,6 +1290,7 @@ class DataStore {
             isReplace = true;
           } 
           this.#presentationUpdates["added"] = addFragments;
+          this.#prevOrdering[field]=updatedOrdering;
         }
 
         this.#presentationUpdates["isReplace"] = isReplace;
@@ -1294,7 +1299,10 @@ class DataStore {
         if(!updatedOrdering || updatedOrdering.length === 0){
           this.#presentationUpdates["isClear"] = true;
         }
-        
+       
+        if(this.#presentationUpdates["removed"].size > 0){
+          this.#prevOrdering[field]=updatedOrdering;
+        }
         const movedNodes = {}
         let sameNumber = false;
         if(!isReplace && updatedOrdering.length === this.#prevOrdering[field].length){
@@ -1319,14 +1327,18 @@ class DataStore {
               for(let a =0;a<this.#storeData[field].length;a++){
                 const item = this.#storeData[field][a];
 
+                
                 if(a+1===updatedOrdering[num]){
-                  swapUpdates.push({
-                    updateIndex:num,
-                    updateData:item
-                  })
+
+                  if(!(updatedOrdering[num]===insertBefore-1)){
+                    swapUpdates.push({
+                      "updateIndex":num,
+                      "updateData":item
+                    })
+                  }
+                 
                 }
-              }
-              
+              }              
             }
           }
           for(let a=swapUpdates.length-1;a>=0;a--){
@@ -1347,6 +1359,7 @@ class DataStore {
 
             let oldStateRow = this.#storeData[field][i];
 
+        
             let hasChanged = false;
             for(let j=0;j<reactiveFields.length;j++){
               const reactiveName = reactiveFields[j];
@@ -1355,7 +1368,6 @@ class DataStore {
               const newState = storeUpdates[field][i][reactiveName];
 
               if(oldState !== newState){  
-                console.log(JSON.stringify(oldState)+":"+JSON.stringify(newState))
                 hasChanged = true;
               }
             }
@@ -1364,7 +1376,6 @@ class DataStore {
               arrayChanges.push(storeUpdates[field][i]);   
             }
           }
-          console.log("Updates:"+JSON.stringify(arrayChanges));
           changeData[field] = arrayChanges;
         }
       } else {
@@ -1379,7 +1390,6 @@ class DataStore {
     this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
 
     Object.keys(storeUpdates).forEach((field)=>{
-      console.log(field);
       this.#storeData[field] = storeUpdates[field]
     });   
 
