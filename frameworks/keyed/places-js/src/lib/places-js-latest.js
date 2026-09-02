@@ -377,10 +377,11 @@ class PresentationComponent {
 }
 
 class PresentationItem {
- 
+
+  nodes = {}
   prevOrdering = [];
   prevState = {};
-
+ 
   prevStateLen(){
     return Object.keys(this.prevState).length;
   }
@@ -394,6 +395,14 @@ class PresentationItem {
       .presentationComponents[this.templateName]
       .templateNode
   } 
+
+  addNode(id,node){
+    this.nodes[id]=node;
+  }
+
+  getNode(id){
+    return this.nodes[id];
+  }
 }
 
 class ContainerComponent extends HTMLElement {
@@ -682,7 +691,7 @@ class ContainerComponent extends HTMLElement {
     presentationItem.attributes = attrs;
 
     presentationItem.dataFieldName = dataFieldName;
-
+    presentationItem.templateRoot = document.getElementById(templateItem.id);
     this.#presentationItems.push(presentationItem);
 
     ContainerComponent.templateCount++;
@@ -726,8 +735,7 @@ class ContainerComponent extends HTMLElement {
       const added = data["added"] ?? [];
       let shouldReplace = data["isReplace"];
 
-      const templateRoot = document.getElementById(presentationItem.id);
-      
+       
       if(added.length >0){
 
         const signalsToRun = presentationComponent.templateSignals;
@@ -752,7 +760,8 @@ class ContainerComponent extends HTMLElement {
           for(let k=0;k<insertData.length;k++){
             const addNode = templateNode.cloneNode(true);          
             addNode.id = insertData[k].id;
- 
+
+            presentationItem.addNode(addNode.id,addNode);
             const fieldNames = Object.keys(insertData[k]);
             for(let a=0;a<fieldNames.length;a++){
                  
@@ -775,9 +784,9 @@ class ContainerComponent extends HTMLElement {
             lastNode.parentNode.insertBefore(addFragment);
           } else {
             if(!shouldReplace){
-              templateRoot.appendChild(addFragment);
+              presentationItem.templateRoot.appendChild(addFragment);
             } else {
-              templateRoot.appendChild(addFragment);
+              presentationItem.templateRoot.appendChild(addFragment);
               shouldReplace = false;
               hasReplaced = true;
             }
@@ -790,14 +799,12 @@ class ContainerComponent extends HTMLElement {
       if(removed && removed.size > 0) { 
 
 				if(data["isClear"] && !hasReplaced){
-          templateRoot.replaceChildren([]);
+          presentationItem.templateRoot.replaceChildren([]);
 					continue;
         }
  
         removed.forEach((id)=>{ 
-          const searchId = `[id="${id}"]`;
-          const node = templateRoot.querySelector(searchId);
-          node.parentNode.removeChild(node);
+          presentationItem.templateRoot.removeChild(presentationItem.getNode(id));
         });
       }
 
@@ -807,13 +814,10 @@ class ContainerComponent extends HTMLElement {
         const moveNodeId = moved[m].moveNodeId;
         const moveBeforeId = moved[m].moveBeforeId;
 
-        console.log(moveNodeId+":"+moveBeforeId);
-        const nodeToMove = templateRoot.querySelector(`[id="${moveNodeId}"]`);
-          
+        const nodeToMove = presentationItem.getNode(moveNodeId); 
         if(moveBeforeId !== null){
           
-          const moveBefore = templateRoot.querySelector(`[id="${moveBeforeId}"]`);
-
+          const moveBefore = presentationItem.getNode(moveBeforeId);
           moveBefore
             .parentNode
             .insertBefore(nodeToMove,moveBefore);
@@ -861,7 +865,7 @@ class ContainerComponent extends HTMLElement {
               signalConfig: presentationItem.signalMapCache[attrName],
               updateData: {
                 "signalData":{[attrName]:attrValue},
-                "elementRoot": templateRoot.querySelector(`[id="${id}"]`)
+                "elementRoot": presentationItem.getNode(id)
               }
             }
           
