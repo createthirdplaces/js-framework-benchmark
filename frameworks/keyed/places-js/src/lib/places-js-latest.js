@@ -38,7 +38,6 @@ class ApiLoadAction{
   }
 
   static async #getErrorData(response, url) {
-onfig:signal;
 
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -506,10 +505,9 @@ class ContainerComponent extends HTMLElement {
       elementRoot
 		} = params.updateData;
     
-    let updated = signalData[fieldName];  
+    let updated = signalData[fieldName] 
     let element = elementRoot;
    
-
     if(!isOuter){       
       const cacheId = `${elementRoot.id}-${signalId}`;
 
@@ -521,19 +519,12 @@ class ContainerComponent extends HTMLElement {
       }
     }
 
-    //TODO: Consider removing this line.
-    if(updated === '') {
-      element.removeAttribute(attr);
-    }
-    
-    else {
-      if (attr === "innerHTML"){
-        element.textContent = updated;
-      } else if(attr==="textContent"){
-        element.textContent = updated;
-      } else {
-        element.setAttribute(attr,`${updated}`);
-      }
+    if (attr === "innerHTML"){
+      element.textContent = updated;
+    } else if(attr==="textContent"){
+      element.textContent = updated;
+    } else {
+      element.setAttribute(attr,`${updated}`);
     }
   }
 
@@ -954,59 +945,51 @@ class ContainerComponent extends HTMLElement {
       }
 
       if(sameNumber){
-				let start = Date.now();
 
-        console.log("updating select with:");
-        console.log(this.#presentationUpdates);
-					const sharedData = {};
-					for(let j=0;j<attrData.length;j++){
-						sharedData[attrData[j].name]= data[attrData[j].itemKey];
-					}
+        const updates = this.#presentationUpdates?.updates[presentationItem.dataFieldName];
 
-					for(let num=0;num<state.length;num++){
-         
-            const id = state[num].id;
-            const itemState = state[num];        
-           
-            const prevProps = presentationItem.prevState[""+id]                   
-						const computedPropValues = {}; 
-						
-            //Calculate computed values.
-            const componentConfig = PresentationComponent
-              .presentationComponents[presentationItem.templateName]
+        const componentConfig = PresentationComponent
+            .presentationComponents[presentationItem.templateName]
+ 
+        const templateSignals = componentConfig.templateSignals;
+        
+        const signalMap = {};
+        if(!presentationItem.signalMapCache){
+          presentationItem.signalMapCache = {};
 
-            componentConfig
-              .computedProps
-              .forEach((computedConfig)=>{
-
-                computedPropValues[computedConfig.field] = 
-                  computedConfig.func({ 
-                    "componentState":itemState,
-                    "sharedState":sharedData
-                  })
-            });
-                  
-            let updatedNode;
-						
-            componentConfig.dynamicSignals.forEach((signalConfig)=>{
-							if(presentationItem.prevState[id][signalConfig.fieldName] !== computedPropValues[signalConfig.fieldName]){
-							
-								this.#generateSignal(
-									{ 
-										signalConfig: signalConfig,
-										updateData: {
-											"signalData":computedPropValues,
-											"elementRoot": this.getRootNode().getElementById(""+id),
-										}
-									}
-								);
-							}
-
-						});
-						
-				  presentationItem.prevState[id] = computedPropValues;
+          for(let i=0;i<templateSignals.length;i++){
+            presentationItem.signalMapCache[templateSignals[i].fieldName] =
+              templateSignals[i];
+          }
         }
-      }	
+
+        for(let i=0;i<updates.length;i++){
+
+          let attrName,attrValue,id;
+
+          Object.keys(updates[i]).forEach((key)=>{
+              if(key === "id"){
+                id = updates[i][key];
+              } else {
+                attrName = key;
+                attrValue = updates[i][key];
+              }
+          });
+        
+          if(id){
+           
+            const updateConfig = { 
+                signalConfig: presentationItem.signalMapCache[attrName],
+                updateData: {
+                  "signalData":{[attrName]:attrValue},
+                  "elementRoot": this.getRootNode().getElementById(""+id),
+                }
+              }
+            
+            this.#generateSignal(updateConfig);
+          } 
+        }
+		  }	
     }
   }
  
@@ -1211,19 +1194,12 @@ class DataStore {
 
   }
 
-
   /**
    * Setup signals to enable fine-grained reactivity on
    * presentation components.
    */
   setupPresentationSignals(presentationSignals){
     this.#presentationSignals = presentationSignals;
-
-
-    /*
-     * TODO: Setup data change observers. They should save changes to pending
-     * updates.
-     */
   } 
 
   #generatePresentationUpdates(updates){
@@ -1294,22 +1270,21 @@ class DataStore {
 
         for(let i=0;i<updates[stateField].length;i++){
 
-          const id = updates[stateField][i].id;
-          if(!presentationUpdates[stateField][id]){
-            presentationUpdates[stateField][id] = {}; 
+          const updateData = updates[stateField][i];
+          const id = updateData.id;          
+          const reactiveFields = this.#presentationSignals[stateField]["update"];
+         
+          for(let j=0;j<reactiveFields.length;j++){
+            changeData.push({
+              "id":id,
+              [reactiveFields[j]]:updateData[`${reactiveFields[j]}`]
+            });
           }
-        
-          let itemUpdate = {};
-          for(let j=0;j<update.length;j++){
-
-            const updateField = update[j];
-            
-            presentationUpdates[stateField][id][updateField]
-              = updates[stateField][i]; 
-          } 
         }
+        presentationUpdates[stateField] = changeData;
       }
     }
+
     return presentationUpdates;
   }
 
@@ -1337,6 +1312,7 @@ class DataStore {
   updateStoreData(storeUpdates){
 
     let changeData = {};
+    this.#presentationUpdates = {};
     /*
      * TODO: Add change detection here.
      */
@@ -1377,8 +1353,8 @@ class DataStore {
       }
     });
 
-    this.#presentationUpdates = this.#generatePresentationUpdates(changeData);
-    
+    this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
+  
     Object.keys(storeUpdates).forEach((field)=>{
       this.#storeData[field] = storeUpdates[field]
     });
@@ -1408,7 +1384,6 @@ class DataStore {
     if(!this.#isLoading) {
       this.#isLoading = true;
 
-      console.log(this.#loadAction);
       const requestConfig = this.#loadAction.getRequestConfig ? this.#loadAction.getRequestConfig(params) : {};
 
       let response = null;

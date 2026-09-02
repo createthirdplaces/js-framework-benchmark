@@ -18,11 +18,11 @@ class Store extends DataStore {
           return [
             {
               "id":prevState,
-              "selected": false
+              "selected": ""
             },
             {
               "id":newState,
-              "selected": true
+              "selected": "danger"
             }
           ]
         }),
@@ -69,7 +69,6 @@ class Store extends DataStore {
     }
         
     run() {
-      console.log("Run"); 
       this.updateStoreData({
         data:this.buildData(),
       });
