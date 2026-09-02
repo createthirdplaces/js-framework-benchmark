@@ -141,7 +141,6 @@ class TableItem extends PresentationComponent {
   clickHandlers() {
     return {
       "select": ({componentId})=>{
-        console.log(componentId);
         store.select(componentId);
       },
       "delete":({componentId})=>{

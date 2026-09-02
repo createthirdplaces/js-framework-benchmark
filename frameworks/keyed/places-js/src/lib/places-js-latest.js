@@ -1301,6 +1301,16 @@ class DataStore {
         }
        
         if(this.#presentationUpdates["removed"].size > 0){
+
+          let updatedPrev = [];
+          
+          for(let a=0;a<this.#storeData[field].length;a++){
+            const item = this.#storeData[field][a];
+            if(!this.#presentationUpdates["removed"].has(item.id)){
+              updatedPrev.push(item);
+            }
+          }
+          this.#storeData[field] = updatedPrev;
           this.#prevOrdering[field]=updatedOrdering;
         }
         const movedNodes = {}
