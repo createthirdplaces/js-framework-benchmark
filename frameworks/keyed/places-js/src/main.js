@@ -162,7 +162,7 @@ class TableItem extends PresentationComponent {
         <td class="col-md-1">
           <a>
             <span
-              aria-hidden="true"
+    t           aria-hidden="true"
               class="glyphicon glyphicon-remove" 
               onClick={{delete}}
             />
@@ -180,7 +180,6 @@ export class MainElement extends ContainerComponent {
       }]
     );
 
-		this.style="display:block";    
     const self = this;
 
     this.addClickEventListeners({
@@ -229,9 +228,7 @@ export class MainElement extends ContainerComponent {
             <table class="table table-hover table-striped test-data" style="table-layout:fixed">
                 <tbody
                     data-component=TableItem
-                    data-repeat
                     data-state=data
-                    selected=data.selected
                 ></tbody>
             </table>
             <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
