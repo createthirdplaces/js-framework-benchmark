@@ -354,7 +354,7 @@ class PresentationComponent {
       eventItem = eventItem.parentNode;
     }
     
-    return eventItem.id;
+    return eventItem.data_id;
   }
 
   isAttributeChar(str){
@@ -492,7 +492,7 @@ class ContainerComponent extends HTMLElement {
     if(!isOuter){       
       const cacheId = `${elementRoot.id}-${signalId}`;
 
-      if(!(cacheId in this.#selectorCache)){
+      if(!(cacheId in this.#selectorCache) || true){
         element=element.querySelector(signalPath);
         this.#selectorCache[cacheId] = element;
       } else {
@@ -759,9 +759,8 @@ class ContainerComponent extends HTMLElement {
           
           for(let k=0;k<insertData.length;k++){
             const addNode = templateNode.cloneNode(true);          
-            addNode.id = insertData[k].id;
 
-            presentationItem.addNode(addNode.id,addNode);
+            presentationItem.addNode(insertData[k].id,addNode);
             const fieldNames = Object.keys(insertData[k]);
             for(let a=0;a<fieldNames.length;a++){
                  
@@ -775,7 +774,8 @@ class ContainerComponent extends HTMLElement {
                 }
               )
             }
- 
+
+            addNode.data_id = insertData[k].id;
             addFragment.appendChild(addNode);
           }
 
@@ -815,9 +815,11 @@ class ContainerComponent extends HTMLElement {
         const moveBeforeId = moved[m].moveBeforeId;
 
         const nodeToMove = presentationItem.getNode(moveNodeId); 
+    
         if(moveBeforeId !== null){
           
           const moveBefore = presentationItem.getNode(moveBeforeId);
+
           moveBefore
             .parentNode
             .insertBefore(nodeToMove,moveBefore);
@@ -860,7 +862,7 @@ class ContainerComponent extends HTMLElement {
         });
       
         if(id){
-         
+        
           const updateConfig = { 
               signalConfig: presentationItem.signalMapCache[attrName],
               updateData: {
@@ -1293,27 +1295,49 @@ class DataStore {
           this.#presentationUpdates["isClear"] = true;
         }
         
-
+        const movedNodes = {}
         let sameNumber = false;
         if(!isReplace && updatedOrdering.length === this.#prevOrdering[field].length){
           sameNumber = true;
+
+          const swapUpdates = [];
           for(let num=0;num<updatedOrdering.length;num++){
 
             if(updatedOrdering[num] !== this.#prevOrdering[field][num]){
+
 
               let insertBefore = null;
               if (num < updatedOrdering.length -1){
                 insertBefore = updatedOrdering[num+1];
               }
+
               this.#presentationUpdates["moved"].push({
                 moveNodeId:updatedOrdering[num],
                 moveBeforeId:insertBefore
               });
+
+              for(let a =0;a<this.#storeData[field].length;a++){
+                const item = this.#storeData[field][a];
+
+                if(a+1===updatedOrdering[num]){
+                  swapUpdates.push({
+                    updateIndex:num,
+                    updateData:item
+                  })
+                }
+              }
+              
             }
           }
+          for(let a=swapUpdates.length-1;a>=0;a--){
+            const swapItem = swapUpdates[a];
+            this.#storeData[field][swapItem.updateIndex]=swapItem.updateData;
+          } 
+
+          this.#prevOrdering[field] = updatedOrdering;
         }
 
-        this.#prevOrdering[field] = updatedOrdering;
+
         if(sameNumber){
          
           const arrayChanges = [];
@@ -1321,14 +1345,17 @@ class DataStore {
 
           for(let i=0;i<storeUpdates[field].length;i++){
 
+            let oldStateRow = this.#storeData[field][i];
+
             let hasChanged = false;
             for(let j=0;j<reactiveFields.length;j++){
               const reactiveName = reactiveFields[j];
               
-              const oldState = this.#storeData[field][i][reactiveName];
+              const oldState = oldStateRow[reactiveName];
               const newState = storeUpdates[field][i][reactiveName];
 
               if(oldState !== newState){  
+                console.log(JSON.stringify(oldState)+":"+JSON.stringify(newState))
                 hasChanged = true;
               }
             }
@@ -1337,6 +1364,7 @@ class DataStore {
               arrayChanges.push(storeUpdates[field][i]);   
             }
           }
+          console.log("Updates:"+JSON.stringify(arrayChanges));
           changeData[field] = arrayChanges;
         }
       } else {
@@ -1347,9 +1375,11 @@ class DataStore {
    });
 
     this.#presentationUpdates["fieldTypeMapping"] = this.#fieldTypeMapping
+
     this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
- 
+
     Object.keys(storeUpdates).forEach((field)=>{
+      console.log(field);
       this.#storeData[field] = storeUpdates[field]
     });   
 
