@@ -69,40 +69,34 @@ class Store extends DataStore {
     }
         
     run() {
-      console.log("Run");
       this.updateStoreData({
         data:this.buildData(),
       });
     }
     
     add() {
-      console.log("Add");
       this.updateStoreData({
         data: this.getStoreData().data.concat(this.buildData(1000))
       });
     }
     
     update() {
-      console.log("Update");
       this.updateData();
     }
     
     select(id) {
-      console.log("Select");
       this.updateStoreData({
         selected:id
       });
     }
     
     runLots() {
-      console.log("Run lots");
       this.updateStoreData({
         data: this.buildData(10000),
         selected:undefined
       });
     }
     clear() {
-      console.log("Clear");
       this.updateStoreData({
         data:[],
         selected:undefined

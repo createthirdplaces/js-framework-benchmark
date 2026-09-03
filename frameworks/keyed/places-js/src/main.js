@@ -38,13 +38,14 @@ class TableItem extends PresentationComponent {
   }
 }
 
+PresentationComponent.init(TableItem);
+
 export class MainElement extends ContainerComponent {
   constructor(){
     super([{
         dataStore:store
       }]
     );
-    PresentationComponent.init(TableItem);
   } 
 }
 

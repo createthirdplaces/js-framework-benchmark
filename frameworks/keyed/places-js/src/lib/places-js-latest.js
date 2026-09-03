@@ -429,17 +429,7 @@ class PresentationItem {
   removeChild(id){
     this.#templateRoot.removeChild(this.#nodes[id]);
   }
-  
-  hide(){
-    const root = this.#templateRoot 
-    this.#parentNode = root.parentNode;
-    this.#parentNode.removeChild(root);
-  }
-
-  show(){
-    this.#parentNode.appendChild(this.#templateRoot);
-  }
-  
+   
   clearNodes() { 
     this.#templateRoot.replaceChildren([]);
     this.#nodes = {};
@@ -824,8 +814,6 @@ class ContainerComponent extends HTMLElement {
       let shouldReplace = data["isReplace"];
  
       if(added && added.length >0){
-
-        presentationItem.hide();
  
         const signalsToRun = presentationComponent.templateSignals;
         
@@ -882,7 +870,6 @@ class ContainerComponent extends HTMLElement {
             }
           }
         }
-        presentationItem.show();
       }
       
       const removed = data["removed"];
