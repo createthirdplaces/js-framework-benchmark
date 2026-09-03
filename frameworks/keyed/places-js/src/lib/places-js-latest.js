@@ -734,9 +734,12 @@ class ContainerComponent extends HTMLElement {
       document.getElementById(presentationItem.id).replaceChildren(elementRoot);
     }  
   }
- 
+
+  //TODO: Read template by querying HTML instead of looking at presentation
+  //component class.
   #setupTemplate(templateItem){
-    
+   
+    console.log("Read template here");
     let attrs = [];
     const attrNames = templateItem.getAttributeNames();
     const dataFieldName = templateItem.getAttribute("data-state");
@@ -989,10 +992,6 @@ class ContainerComponent extends HTMLElement {
           });
         }
       
-        presentationConfig.createClickHandler(templateId.id);
-        /*if(presentationConfig?.clickTemplateEvents){
-          presentationConfig.createClickHandler(templateId.id);
-        } */
     });
   }
  

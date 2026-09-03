@@ -41,15 +41,35 @@
 
       <main-element>
         <table class="table table-hover table-striped test-data">
-            <tbody
-                data-component=TableItem
-                data-state=data
-            ></tbody>
+          <tbody
+              data-component=TableItem
+              data-state=data
+          >
+            <tr class={{selected}}>
+              <td class="col-md-1" textContent={{id}}/>
+              <td class="col-md-4">
+                <a 
+                  onClick={{select}} 
+                  textContent={{label}}
+                />
+              </td>
+              <td class="col-md-1">
+                <a>
+                  <span
+                     aria-hidden="true"
+                    class="glyphicon glyphicon-remove" 
+                    onClick={{delete}}
+                  />
+                </a>
+              </td>
+             <td class="col-md-6"/>
+            </tr>
+          </tbody>
         </table>
       </main-element>
       <span class="preloadicon glyphicon glyphicon-remove" aria-hidden="true"></span>
-  </div>
+   </div>
   <script type="module" async src="src/main.js"></script>
   <script type="module" async src="src/eventHandlerComponent.js"></script>
-</body>
+  </body>
 </html>
