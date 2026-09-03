@@ -405,7 +405,6 @@ class PresentationItem {
   }
   
   setTemplateRoot(root){
-    console.log("Root:"+root);
     this.#templateRoot = root;
   }
  
@@ -447,6 +446,52 @@ class PresentationItem {
   }
 }
 
+class UserEventComponent extends HTMLElement {
+
+  static #clickSplitRegex = new RegExp("onclick=\"{{","i");
+  #handlerMap = {};
+ 
+  constructor(){
+    super();
+   
+    const split = this.innerHTML.split(UserEventComponent.#clickSplitRegex);
+    for(let i=1; i<split.length; i++){
+      const sectionSplit = split[i].split("}}");
+      const handlerName = sectionSplit[0];
+      split[i]=`data-${this.nodeName}-click="${handlerName}"${sectionSplit[1]}`;
+    }   
+    this.innerHTML = split.join("");
+  }
+ 
+
+  addClickEvents(handlerConfig){
+ 
+    const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
+
+    this
+      .querySelectorAll(`[${clickSelectorName}]`)
+      .forEach((node)=>{
+        
+        const eventHandlerName = node.attributes[clickSelectorName].value;
+
+        node.id = eventHandlerName;
+        node.removeAttribute(clickSelectorName);
+        
+        this.#handlerMap[node.id] = handlerConfig[eventHandlerName];
+    });
+
+    this.addEventListener("click",(e)=>{
+      const clickId = e.target?.id;
+
+      if(this.#handlerMap[clickId]){
+        this.#handlerMap[clickId](e);
+      }
+    });
+    
+  }
+
+}
+
 class ContainerComponent extends HTMLElement {
 
   #componentIsRendering = false;
@@ -468,6 +513,9 @@ class ContainerComponent extends HTMLElement {
   //HTML before loading animiation.
   #htmlBeforeLoading;
 
+  #lightDomHTML = "<p>Use light DOM or render() method to show HTML</p>";
+
+
   static templateCount = 0;
   static changeTemplateEvents = {};
   static clickTemplateEvents = {};
@@ -486,10 +534,11 @@ class ContainerComponent extends HTMLElement {
   constructor(dataStoreSubscriptions = [], loadingIndicatorConfig) {
     super();
 
-    if(loadingIndicatorConfig){
-      this.#loadingIndicatorConfig = loadingIndicatorConfig;
+    //Light DOM is enabled.
+    if(this.innerHTML){
+      this.#lightDomHTML = this.innerHTML;
     }
-
+   
     //Performance optimization if component is not subscribed to data stores.
     if(dataStoreSubscriptions.length === 0) {
       return;
@@ -503,7 +552,6 @@ class ContainerComponent extends HTMLElement {
 
     this.updateFromSubscribedStores();
 
-    this._internals = this.attachInternals();
   }
 
   init(initialState){
@@ -554,9 +602,6 @@ class ContainerComponent extends HTMLElement {
     this.#changeEventListeners = eventListeners;
   }
   
-  addClickEventListeners(eventListeners){
-    this.#clickEventListeners = eventListeners;
-  }
  
   /**
 	 * Shows custom loading indicator if it exists. This custom loading indicator
@@ -640,6 +685,10 @@ class ContainerComponent extends HTMLElement {
         dataToUpdate,
       );
     }
+  }
+
+  render(){
+    return this.#lightDomHTML;
   }
 
   #updateSingleItemTemplate(presentationItem,state){
@@ -922,7 +971,6 @@ class ContainerComponent extends HTMLElement {
  
   #initPresentationComponents(data) {
     this.#renderTemplates(data,this.getRootNode());
-
       this.#renderTemplates.templateIds.forEach((templateId)=>{
     
         const changeHandlers = ContainerComponent.changeTemplateEvents[templateId.templateName.toUpperCase()]
@@ -960,47 +1008,6 @@ class ContainerComponent extends HTMLElement {
         } */
     });
   }
-
-  #setupClickListenerMapping(html){
-
-    const split = html.split("onClick={{");
-    for(let i=1; i<split.length; i++){
-      const sectionSplit = split[i].split("}}");
-      const handlerName = sectionSplit[0];
-      split[i]=`data-${this.nodeName}-click="${handlerName}"${sectionSplit[1]}`;
-    }  
-    return split.join("");
-  }
-
-  #addContainerClickListeners(){
-
-    if(this.#clickEventListenersAdded){
-      return;
-    }
-   
-    const handlerMap = {};
-    const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
- 
-    this.getRootNode()    
-      .querySelectorAll(`[${clickSelectorName}]`)
-      .forEach((node)=>{
-        
-        const eventHandlerName = node.attributes[clickSelectorName].value;
-        node.removeAttribute(clickSelectorName);
-        
-        handlerMap[node.id] = this.#clickEventListeners[eventHandlerName];
-    });
-
-    this.getRootNode().addEventListener("click",(e)=>{
-      const clickId = e.target?.id;
-
-      if(handlerMap[clickId]){
-        handlerMap[clickId](e);
-      }
-    });
-    
-    this.#clickEventListenersAdded = true;
-  }
  
   #generateAndSaveHTML(data) {
 
@@ -1021,25 +1028,17 @@ class ContainerComponent extends HTMLElement {
           const self = this;
           if(remainingTime > 0){
             setTimeout(()=>{ 
-              const html = this.render(data);
-							this.innerHTML = this.#setupClickListenerMapping(html);
-              this.#addContainerClickListeners();
+              this.innerHTML = this.render(data);
             },remainingTime);
           } else {
-            const html = this.render(data);
-            this.innerHTML = this.#setupClickListenerMapping(html);
-            this.#addContainerClickListeners();
+            this.innerHTML = this.render(data);
           }
         } else {
-          const html = this.render(data);
-          this.innerHTML = this.#setupClickListenerMapping(html);
-          this.#addContainerClickListeners();
+          this.innerHTML = this.render(data);
         }
       }
       else {
-        const html = this.render(data);
-        this.innerHTML = this.#setupClickListenerMapping(html);
-        this.#addContainerClickListeners();
+        this.innerHTML =  this.render(data);
       }
 
       this.#initPresentationComponents(data);
@@ -1083,6 +1082,8 @@ class DataStore {
 
   static #storeCount = 0;
 
+  static #storeRegistry = {};
+
   #componentSubscriptions = [];
   #isLoading = false; 
   #loadAction;
@@ -1096,12 +1097,22 @@ class DataStore {
   #prevOrdering = {};
   #fieldTypeMapping = {};
   
-  constructor(loadAction) {
+  constructor(loadAction, storeName) {
     this.#loadAction = loadAction;
     this.#componentSubscriptions = [];
     this.#requestStoreId = `store-${DataStore.#storeCount}`;
     
 	  sessionStorage.setItem(this.#requestStoreId, JSON.stringify({}));
+
+    if(!storeName){
+      throw new Error("Store name not defined");
+    }
+    
+    if(storeName in DataStore.#storeRegistry){
+      throw new Error(`Invalid store name ${storeName}. Store names must be uniquie`);
+    }
+    DataStore.#storeRegistry[storeName] = this;
+
     DataStore.#storeCount++;
 
   }
@@ -1522,4 +1533,4 @@ class DataStore {
   }
 }
 
-export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, PresentationComponent};
+export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, PresentationComponent, UserEventComponent};
