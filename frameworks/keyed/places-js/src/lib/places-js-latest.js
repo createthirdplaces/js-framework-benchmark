@@ -115,9 +115,12 @@ class ApiLoadAction{
   }
 }
 
-class PresentationComponent {
- 
-  static presentationComponents = {};
+class TemplateItem {
+  
+  #nodes = {}
+
+  #parentNode;
+  #templateRoot = null;
 
   #clickTemplateEvents;
   #changeTemplateEvents;
@@ -128,38 +131,15 @@ class PresentationComponent {
 
   #handlerDepthMap = {};
 
-  //#clickHandlers;
-
-  createClickHandler(id){
-    document.getElementById(id)
-      .addEventListener("click",(e)=>{
-
-        const clickId = e.target.getAttribute("data-click-id")
-                || e.target.parentNode.getAttribute("data-click-id") 
-                || e.target.parentNode.parentNode.getAttribute("data-click-id") 
-
-        if(clickId){
-
-          const key = "data-click-id_"+clickId;
-          const componentId 
-            = this.getItemIdForEvent({
-                "eventItem":e.target,
-                "key":key});
-         
-          const handlerName = this.#clickTemplateEvents[clickId];
-          this.clickHandlers()[handlerName]({
-            "componentId":componentId
-          });
-        } 
-    });
+  constructor(html){
+    this.#defineComponent(html);
   }
-  
-  #defineComponent(){
+    
+  #defineComponent(templateStr){
 
     let template = document.createElement("template");
-    let templateStr = this.defineTemplate();
 
-    this.templateSignals = [];
+    this.#templateSignals = [];
  
     const clickEvents = [];
     const changeEvents = [];
@@ -175,6 +155,7 @@ class PresentationComponent {
      * n is the number of template items and m is the length of the template string.
      * This logic should run in O(m*n) time or better.
      */   
+    console.log(templateStr);
     const clickEventsStr = templateStr.split("onClick={{");
     if(clickEventsStr.length > 1){
       for(let i=1;i<clickEventsStr.length;i++){
@@ -383,23 +364,14 @@ class PresentationComponent {
     return (code > 64 && code < 91) || (code > 96 && code < 123)
   }
   
-  static init(item){
+  static init(componentHtml){
 
+    let template = new TemplateItem(componentHTML)
     const obj = new item.prototype.constructor(); 
     obj.#defineComponent();
 
-    PresentationComponent
-      .presentationComponents[obj.constructor.name.toUpperCase()] = obj;
   } 
-}
-
-class PresentationItem {
-
-  #nodes = {}
-
-  #parentNode;
-  #templateRoot = null;
-
+  
   setTemplateName(templateName){
     this.templateName = templateName.toUpperCase();
   }
@@ -436,6 +408,7 @@ class PresentationItem {
   }
 }
 
+
 class UserEventComponent extends HTMLElement {
 
   static #clickSplitRegex = new RegExp("onclick=\"{{","i");
@@ -454,7 +427,7 @@ class UserEventComponent extends HTMLElement {
   }
  
 
-  addClickEvents(handlerConfig){
+  setClickEvents(handlerConfig){
  
     const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
 
@@ -476,10 +449,8 @@ class UserEventComponent extends HTMLElement {
       if(this.#handlerMap[clickId]){
         this.#handlerMap[clickId](e);
       }
-    });
-    
+    });  
   }
-
 }
 
 class ContainerComponent extends HTMLElement {
@@ -497,7 +468,7 @@ class ContainerComponent extends HTMLElement {
 
   #componentStore = {};
 
-  #presentationItems = []
+  #templateItem;
   #templateLoaded = false;
 
   //HTML before loading animiation.
@@ -505,13 +476,15 @@ class ContainerComponent extends HTMLElement {
 
   #lightDomHTML = "<p>Use light DOM or render() method to show HTML</p>";
 
+  #selectorCache = {};
+ 
+  static #templateCount = 0;
+  
+  #changeTemplateEvents = {};
+  #clickTemplateEvents = {};
 
-  static templateCount = 0;
-  static changeTemplateEvents = {};
-  static clickTemplateEvents = {};
-
-  static changeTemplateItemHandlers = {};
-  static clickTemplateItemHandlers = {};
+  #changeTemplateItemHandlers = {};
+  #clickTemplateItemHandlers = {};
 
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
@@ -548,7 +521,9 @@ class ContainerComponent extends HTMLElement {
     this.updateData(initialState);
   }
  
-  #selectorCache = {};
+  setClickEvents(events){
+    this.#clickTemplateEvents = events;
+  }
 
   #generateSignal(params){
 
@@ -681,18 +656,18 @@ class ContainerComponent extends HTMLElement {
     return this.#lightDomHTML;
   }
 
-  #updateSingleItemTemplate(presentationItem,state){
+  #updateSingleItemTemplate(templateItem,state){
    
-    const templateName = presentationItem.templateName;
-    const prevProps = presentationItem.prevState;
+    const templateName = templateItem.templateName;
+    const prevProps = templateItem.prevState;
 
     let elementRoot;
 
     if(Object.keys(prevProps).length === 0){
 
-      elementRoot = presentationItem.getTemplateNode().cloneNode(true);
+      elementRoot = templateItem.getTemplateNode().cloneNode(true);
       
-      const signalsToRun = PresentationComponent.presentationComponents[templateName].templateSignals;
+      const signalsToRun = this.#templateItem.templateSignals;
 
       signalsToRun.forEach((signalConfig)=>{
         this.#generateSignal(
@@ -709,14 +684,14 @@ class ContainerComponent extends HTMLElement {
       
     } else {
 
-      elementRoot = this.getRootNode().getElementById(presentationItem.id);
+      elementRoot = this.getRootNode().getElementById(templateItem.id);
         
       if(!elementRoot){
         console.error("No id set for template");
       }   
     }
 
-    const signalsToRun = PresentationComponent.presentationComponents[templateName].signals;
+    const signalsToRun = this.#templateItem.signals;
 
 		signalsToRun.forEach((signalConfig)=>{
 			
@@ -731,85 +706,37 @@ class ContainerComponent extends HTMLElement {
     });
 
     if(Object.keys(prevProps).length === 0){
-      document.getElementById(presentationItem.id).replaceChildren(elementRoot);
+      document.getElementById(templateItem.id).replaceChildren(elementRoot);
     }  
   }
 
-  //TODO: Read template by querying HTML instead of looking at presentation
-  //component class.
-  #setupTemplate(templateItem){
-   
-    console.log("Read template here");
-    let attrs = [];
-    const attrNames = templateItem.getAttributeNames();
-    const dataFieldName = templateItem.getAttribute("data-state");
-    const dataTemplateName = templateItem.getAttribute("data-component");
+  #setupTemplate(){
+      
+    let templateNode = this.querySelector("[data-template]");
 
-    for(let j=0;j<attrNames.length;j++){
-      const attrName = attrNames[j]; 
-      const attrValue = templateItem.getAttribute(attrName);
-      if(attrName.startsWith("data")||attrValue.startsWith("data")){
-        templateItem.removeAttribute(attrName);
-      }
-      attrs.push({
-        name:attrName,
-        value:attrValue
-      });
-    }   
+    let templateHTML = templateNode ? templateNode.innerHTML : this.innerHTML;
+    this.#templateItem = new TemplateItem(this.innerHTML); 
     
-    templateItem.id = `template-${ContainerComponent.templateCount}-${dataTemplateName}`;
-
-    this.#renderTemplates.templateIds.push({
-      "id":templateItem.id,
-      "templateName":dataTemplateName
-    });
- 
-    if(!dataFieldName){
-      throw new Error(`No data field defined for template ${dataTemplateName} in component ${this.nodeName}`);
-    }
-   
-    let presentationItem = new PresentationItem(); 
-    presentationItem.id = templateItem.id;
-    presentationItem.setTemplateName(dataTemplateName);
-    presentationItem.attributes = attrs;
-
-    presentationItem.dataFieldName = dataFieldName;
-    presentationItem.setTemplateRoot(document.getElementById(templateItem.id));
-    this.#presentationItems.push(presentationItem);
-
-    ContainerComponent.templateCount++;
-
+    templateItem.dataField = templateNode.getAttributeNode("data-template").value
+    templateItem.id =  `template-${ContainerComponent.templateCount}`
+    templateItem.setTemplateName(this.nodeName);
   }
   
-  #renderTemplates(data,content) {
+  #renderTemplate(data) {
 
-    this.#renderTemplates.templateIds = []; 
-    if(!this.#presentationItems || Object.keys(this.#presentationItems).length === 0){
-
-      const templates = content.querySelectorAll("[data-component]");
-			if(!this.#presentationItems){
-          this.#presentationItems = {};;
-        }
-
-      for(let i=0;i<templates.length;i++){
-        this.#setupTemplate(templates[i]);  
-      }
-
-			if(this.#presentationItems.length > 0 ){
-				this.#templateLoaded = true;
-			}
+    if(!this.#templateItem){
+      this.#setupTemplate();  
     }
 
-    for(let i = 0; i < this.#presentationItems.length;i++){
+    if(this.#templateItem){
 
-      const presentationItem = this.#presentationItems[i]; 
-      const presentationComponent = PresentationComponent.presentationComponents[presentationItem.templateName];
+      const presentationComponent = PresentationComponent.presentationComponents[this.#templateItem.templateName];
       
-      let state = data[presentationItem.dataFieldName] || []; 
+      let state = data[this.#templateItem.dataFieldName] || []; 
  
-      if(data?.fieldTypeMapping?.[presentationItem.dataFieldName] === "item"){ 
-        this.#updateSingleItemTemplate(this.#presentationItems[i],data);  
-        continue;
+      if(data?.fieldTypeMapping?.[this.#templateItem.dataFieldName] === "item"){ 
+        this.#updateSingleItemTemplate(this.#templateItem,data);  
+        return;
       }
 
       let hasReplaced = false;
@@ -819,17 +746,18 @@ class ContainerComponent extends HTMLElement {
       if(added && added.length >0){
  
         const signalsToRun = presentationComponent.templateSignals;
-        
-        if(!presentationItem.signalMapCache){
-          presentationItem.signalMapCache = {};
+       
+        //TODO: Move this logic somewhere else.
+        if(!this.#templateItem.signalMapCache){
+          this.#templateItem.signalMapCache = {};
 
           for(let i=0;i<signalsToRun.length;i++){
-            presentationItem.signalMapCache[signalsToRun[i].fieldName] =
+            this.#templateItem.signalMapCache[signalsToRun[i].fieldName] =
               signalsToRun[i];
           }
         }
 
-        const templateNode = presentationItem.getTemplateNode();
+        const templateNode = this.#templateItem.getTemplateNode();
         for(let j=0;j<added.length;j++){
 
           const insertBefore = added[j].insertBefore;
@@ -842,13 +770,13 @@ class ContainerComponent extends HTMLElement {
 
             addNode.data_id = insertData[k].id;
             
-            presentationItem.addNode(insertData[k].id,addNode);
+            this.#templateItem.addNode(insertData[k].id,addNode);
             const fieldNames = Object.keys(insertData[k]);
             for(let a=0;a<fieldNames.length;a++){
                  
               this.#generateSignal(
                 {
-                  signalConfig:presentationItem.signalMapCache[fieldNames[a]],
+                  signalConfig:templateItem.signalMapCache[fieldNames[a]],
                   updateData:{
                     "signalData":insertData[k],
                     "elementRoot":addNode,
@@ -865,7 +793,7 @@ class ContainerComponent extends HTMLElement {
             lastNode.parentNode.insertBefore(addFragment);
           } else {
 
-            presentationItem.appendChild(addFragment);
+            this.#templateItem.appendChild(addFragment);
             
             if(shouldReplace){
               shouldReplace = false;
@@ -880,12 +808,11 @@ class ContainerComponent extends HTMLElement {
       if(removed && removed.size > 0) { 
 
 				if(data["isClear"] && !hasReplaced){
-          presentationItem.clearNodes();
-					continue;
+          this.#templateItem.clearNodes();
         }
 
         removed.forEach((id)=>{ 
-          presentationItem.removeChild(id);
+          this.#templateItem.removeChild(id);
         });
       }
 
@@ -895,11 +822,11 @@ class ContainerComponent extends HTMLElement {
         const moveNodeId = moved[m].moveNodeId;
         const moveBeforeId = moved[m].moveBeforeId;
 
-        const nodeToMove = presentationItem.getNode(moveNodeId); 
+        const nodeToMove = this.#templateItem.getNode(moveNodeId); 
     
         if(moveBeforeId !== null){
           
-          const moveBefore = presentationItem.getNode(moveBeforeId);
+          const moveBefore = this.#templateItem.getNode(moveBeforeId);
 
           moveBefore
             .parentNode
@@ -909,22 +836,23 @@ class ContainerComponent extends HTMLElement {
         }  
       }
  
-      const updates = data?.updates?.[presentationItem.dataFieldName];
+      const updates = data?.updates?.[this.#templateItem.dataFieldName];
 
       if(!updates){
-        continue;
+        return;
       }
 
       const componentConfig = PresentationComponent
-          .presentationComponents[presentationItem.templateName]
+          .presentationComponents[this.#templateItem.templateName]
 
       const templateSignals = componentConfig.templateSignals;
-      
-      if(!presentationItem.signalMapCache){
-        presentationItem.signalMapCache = {};
+     
+      //TODO: Move this logic.
+      if(!this.#templateItem.signalMapCache){
+        this.#templateItem.signalMapCache = {};
 
         for(let i=0;i<templateSignals.length;i++){
-          presentationItem.signalMapCache[templateSignals[i].fieldName] =
+          this.#templateItem.signalMapCache[templateSignals[i].fieldName] =
             templateSignals[i];
         }
       }
@@ -946,10 +874,10 @@ class ContainerComponent extends HTMLElement {
         if(id){
  
           const updateConfig = { 
-              signalConfig: presentationItem.signalMapCache[attrName],
+              signalConfig: this.#templateItem.signalMapCache[attrName],
               updateData: {
                 "signalData":{[attrName]:attrValue},
-                "elementRoot": presentationItem.getNode(id)
+                "elementRoot": this.#templateItem.getNode(id)
               }
             }
          
@@ -958,43 +886,7 @@ class ContainerComponent extends HTMLElement {
       }
     }
   }
- 
-  #initPresentationComponents(data) {
-    this.#renderTemplates(data,this.getRootNode());
-      this.#renderTemplates.templateIds.forEach((templateId)=>{
-    
-        const changeHandlers = ContainerComponent.changeTemplateEvents[templateId.templateName.toUpperCase()]
-
-        const presentationConfig = PresentationComponent.presentationComponents[templateId.templateName.toUpperCase()];
-
-
-        if(presentationConfig?.changeTemplateEvents){
-          document.getElementById(templateId.id)
-            .addEventListener("change",(e)=>{
-
-              const changeId = e.target.getAttribute("data-change-id") ||
-                         e.target.parentNode.getAttribute("data-change-id") ||  
-                         e.target.parentNode.parentNode.getAttribute("data-change-id")
-
-              if(changeId){
-
-                const key = "data-change-id_"+changeId;
-                const componentId 
-                  = presentationConfig.getItemIdForEvent({
-                      "eventItem":e.target,
-                      "key":key});
-               
-                const handlerName = presentationConfig.changeTemplateEvents[changeId];
-                presentationConfig.changeHandlers()[handlerName]({
-                  "componentId":componentId
-                });
-             }
-          });
-        }
-      
-    });
-  }
- 
+  
   #generateAndSaveHTML(data) {
 
     //Don't re-render static HTML if templates are being used.
@@ -1027,13 +919,13 @@ class ContainerComponent extends HTMLElement {
         this.innerHTML =  this.render(data);
       }
 
-      this.#initPresentationComponents(data);
+      this.#renderTemplate(data);
 		} else {
 
       if(this.#htmlBeforeLoading){
         this.innerHTML = this.#htmlBeforeLoading;  
       }
-			this.#renderTemplates(data,this);
+			this.#renderTemplate(data);
     }		
   } 
 }
@@ -1079,7 +971,6 @@ class DataStore {
   #requestStoreId;
   #storeData = null;
 
-
   #prevOrdering = {};
   #fieldTypeMapping = {};
   
@@ -1097,10 +988,9 @@ class DataStore {
     if(storeName in DataStore.#storeRegistry){
       throw new Error(`Invalid store name ${storeName}. Store names must be uniquie`);
     }
+
     DataStore.#storeRegistry[storeName] = this;
-
     DataStore.#storeCount++;
-
   }
 
   /**
@@ -1519,4 +1409,4 @@ class DataStore {
   }
 }
 
-export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, PresentationComponent, UserEventComponent};
+export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, UserEventComponent};

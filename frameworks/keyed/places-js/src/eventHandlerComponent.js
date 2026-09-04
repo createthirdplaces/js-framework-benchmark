@@ -3,7 +3,7 @@ import {store} from './store.js';
 export class EventHandlerComponent extends UserEventComponent {
   constructor(){
     super();
-    this.addClickEvents({
+    this.setClickEvents({
       "add": ()=>store.add(),
       "run": ()=>store.run(),
       "update":()=>store.update(),
