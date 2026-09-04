@@ -116,46 +116,52 @@ class ApiLoadAction{
 }
 
 class TemplateItem {
-  
+ 
+  #clickTemplateEvents;
+  #changeTemplateEvents;
+
+  #handlerDepthMap = {};
   #nodes = {}
 
   #parentNode;
-  #templateRoot = null;
-
-  #clickTemplateEvents;
-  #changeTemplateEvents;
- 
-  #templateSignals;
 
   #templateNode;
-
-  #handlerDepthMap = {};
+  #templateRoot = null;
+  #templateSignals;
+  #signalMap = {}
 
   constructor(html){
     this.#defineComponent(html);
   }
-    
+   
+  #initSignalMap(){
+    for(let i=0;i<this.#templateSignals.length;i++){
+      this.#signalMap[this.#templateSignals[i].fieldName] =
+        this.#templateSignals[i];
+    }
+  }
+
+  getSignalByFieldName(fieldName){
+    return this.#signalMap[fieldName] 
+  }
+  
   #defineComponent(templateStr){
 
-    let template = document.createElement("template");
-
-    this.#templateSignals = [];
- 
-    const clickEvents = [];
     const changeEvents = [];
-
-    const clickHandlers = {};
     const changeHandlers = {};
-
+    const clickEvents = [];
+    const clickHandlers = {};
     const start = Date.now();
-    let i = 0;
+ 
+    this.#templateSignals = [];
+    
+    let template = document.createElement("template"); 
 
     /* TOOD: Optimize. 
      * This logic is running in O(m*n^2) time with repetitive iteration.
      * n is the number of template items and m is the length of the template string.
      * This logic should run in O(m*n) time or better.
      */   
-    console.log(templateStr);
     const clickEventsStr = templateStr.split("onClick={{");
     if(clickEventsStr.length > 1){
       for(let i=1;i<clickEventsStr.length;i++){
@@ -185,17 +191,20 @@ class TemplateItem {
     this.#clickTemplateEvents = clickEvents;
 
     const signalIds = [];
-  
+
+    let i = 0;
     while(true){
-      let stateVarPos = templateStr.indexOf("{{");
+      let stateVarPos = templateStr.indexOf("\"{{");
+
       if(stateVarPos === -1){
         break;
       }
      
       let firstTagEnd = templateStr.indexOf(">");
       
-      const endPos = templateStr.indexOf("}}");
-      const signalStr = templateStr.substring(stateVarPos+2, endPos);
+      const endPos = templateStr.indexOf("}}\"");
+
+      const signalStr = templateStr.substring(stateVarPos+3, endPos);
 
       let attr, fieldName;
 
@@ -217,15 +226,15 @@ class TemplateItem {
       }
 
       //Set signal for HTML and text template strings.
-      let isHTML = false;
+      let isHtmlAttr = false;
       let endTagPos = -1;
 
       if(attr === "innerHTML"){
         for(let j = stateVarPos -1; j >= 0; j--){
           if(templateStr.charAt(j) === ">"){
 
-            endTagPos = j;
-            isHTML = true;
+            endTagPos = j + 1 ;
+            isHtmlAttr = true;
             break;
           } 
         }
@@ -239,7 +248,6 @@ class TemplateItem {
       
       let templateFuncType = "";
      
-     
       const signalData = {
         fieldName,
         attr,
@@ -248,13 +256,15 @@ class TemplateItem {
         isOuter: endPos < firstTagEnd
       } 
 
-      if(!isHTML){
+      if(!isHtmlAttr){
+   
         if(newStr.length > 0 ){
           templateStr = templateStr.substring(0,stateVarPos) +
-            newStr + templateStr.substring(endPos+2);
+            " " +
+            newStr + templateStr.substring(endPos+3);
         } else {
           templateStr = templateStr.substring(0,stateVarPos) +
-            newStr + templateStr.substring(endPos+2);
+            newStr + templateStr.substring(endPos+3);
         }
       } else {
         templateStr =
@@ -262,10 +272,11 @@ class TemplateItem {
           " " +
           newStr +
           ">" +
-          templateStr.substring(endPos+2);
+          templateStr.substring(endPos+3);
+
       }
 
-      this.templateSignals.push(signalData)
+      this.#templateSignals.push(signalData)
       i++;
     } 
 
@@ -288,15 +299,13 @@ class TemplateItem {
     templateStr = linesToAdd.join("");
     template.innerHTML = templateStr;
     
-    this.templateNode = template.content.firstChild;
-
     const handlerAttrs = ["data-click-id","data-change-id"];
 
     handlerAttrs.forEach((handlerAttr)=>{
       
       const attrSelector = `[${handlerAttr}]`; 
  
-      this.templateNode
+      template
         .querySelectorAll(attrSelector)
         .forEach((node)=>{
 
@@ -313,9 +322,11 @@ class TemplateItem {
           this.#handlerDepthMap[handlerDepthKey] = depth;  
         });
     });
-    
-    this.templateSignals.forEach((signal)=>{
+   
+    for(let i=0; i<this.#templateSignals.length; i++){
       
+      const signal = this.#templateSignals[i];
+     
       // A signal id of less than one means that the data is 
       // at the root.      
       if(signal.signalId >= 0){
@@ -323,13 +334,13 @@ class TemplateItem {
         const selector = `[${signal.signalPath}]`
 
         let childNodePath = [];
-        let node = this.templateNode.querySelector(selector);
+        let node = template.content.querySelector(selector);
         let searchNode = node;
 
         while(searchNode.parentNode.nodeName !== "#document-fragment"){ 
-          for(let i=0;i<searchNode.parentNode.childNodes.length;i++){ 
-            if(Object.is(searchNode.parentNode.childNodes[i],searchNode)){
-              childNodePath.push(`:nth-child(${i+1})`);
+          for(let j=0; j<searchNode.parentNode.childNodes.length; j++){ 
+            if(Object.is(searchNode.parentNode.childNodes[j], searchNode)){
+              childNodePath.push(`:nth-child(${j+1})`);
             }
           }
           searchNode = searchNode.parentNode;
@@ -339,7 +350,10 @@ class TemplateItem {
         node.attributes.removeNamedItem(signal.signalPath);
         signal.signalPath = childNodePath.join(">");
       }
-    });
+    }
+
+    this.#templateNode = template.content.firstChild;
+    this.#initSignalMap();
 
     //Tenplate parsing needs to be optimized for performance.
     //This is to display the overhead of the current logic.
@@ -385,9 +399,7 @@ class TemplateItem {
   }
   
   getTemplateNode(){ 
-    return PresentationComponent
-      .presentationComponents[this.templateName]
-      .templateNode
+    return this.#templateNode
   } 
 
   addNode(id,node){
@@ -554,6 +566,7 @@ class ContainerComponent extends HTMLElement {
       }
     }
 
+    
     if (attr === "textContent"){
       element.textContent = updated;
     } else if(attr==="innerHTML"){
@@ -715,11 +728,14 @@ class ContainerComponent extends HTMLElement {
     let templateNode = this.querySelector("[data-template]");
 
     let templateHTML = templateNode ? templateNode.innerHTML : this.innerHTML;
-    this.#templateItem = new TemplateItem(this.innerHTML); 
-    
-    templateItem.dataField = templateNode.getAttributeNode("data-template").value
-    templateItem.id =  `template-${ContainerComponent.templateCount}`
-    templateItem.setTemplateName(this.nodeName);
+    this.#templateItem = new TemplateItem(templateHTML); 
+
+
+    console.error("Template root not set");
+    templateNode.innerHTML = "";
+    this.#templateItem.dataField = templateNode.getAttributeNode("data-template").value
+    this.#templateItem.id =  `template-${ContainerComponent.templateCount}`
+    this.#templateItem.setTemplateName(this.nodeName);
   }
   
   #renderTemplate(data) {
@@ -730,8 +746,6 @@ class ContainerComponent extends HTMLElement {
 
     if(this.#templateItem){
 
-      const presentationComponent = PresentationComponent.presentationComponents[this.#templateItem.templateName];
-      
       let state = data[this.#templateItem.dataFieldName] || []; 
  
       if(data?.fieldTypeMapping?.[this.#templateItem.dataFieldName] === "item"){ 
@@ -739,25 +753,12 @@ class ContainerComponent extends HTMLElement {
         return;
       }
 
-      let hasReplaced = false;
       const added = data["added"];
-      let shouldReplace = data["isReplace"];
- 
-      if(added && added.length >0){
- 
-        const signalsToRun = presentationComponent.templateSignals;
-       
-        //TODO: Move this logic somewhere else.
-        if(!this.#templateItem.signalMapCache){
-          this.#templateItem.signalMapCache = {};
 
-          for(let i=0;i<signalsToRun.length;i++){
-            this.#templateItem.signalMapCache[signalsToRun[i].fieldName] =
-              signalsToRun[i];
-          }
-        }
-
+      if(added?.length > 0){
+ 
         const templateNode = this.#templateItem.getTemplateNode();
+
         for(let j=0;j<added.length;j++){
 
           const insertBefore = added[j].insertBefore;
@@ -772,11 +773,12 @@ class ContainerComponent extends HTMLElement {
             
             this.#templateItem.addNode(insertData[k].id,addNode);
             const fieldNames = Object.keys(insertData[k]);
+
             for(let a=0;a<fieldNames.length;a++){
                  
               this.#generateSignal(
                 {
-                  signalConfig:templateItem.signalMapCache[fieldNames[a]],
+                  signalConfig:this.#templateItem.getSignalByFieldName(fieldNames[a]),
                   updateData:{
                     "signalData":insertData[k],
                     "elementRoot":addNode,
@@ -792,25 +794,18 @@ class ContainerComponent extends HTMLElement {
             const lastNode = document.getElementById(""+insertBefore);
             lastNode.parentNode.insertBefore(addFragment);
           } else {
-
-            this.#templateItem.appendChild(addFragment);
-            
-            if(shouldReplace){
-              shouldReplace = false;
-              hasReplaced = true;
-            }
+            this.#templateItem.appendChild(addFragment); 
           }
         }
       }
       
-      const removed = data["removed"];
+      const removed = data["removed"] || [];
 
-      if(removed && removed.size > 0) { 
+      if(removed.size > 0) { 
 
 				if(data["isClear"] && !hasReplaced){
           this.#templateItem.clearNodes();
         }
-
         removed.forEach((id)=>{ 
           this.#templateItem.removeChild(id);
         });
@@ -818,10 +813,10 @@ class ContainerComponent extends HTMLElement {
 
       const moved = data["moved"] || [];
 
-      for(let m=0;m<moved.length;m++){
+      for(let m=0; m<moved.length; m++){
+       
         const moveNodeId = moved[m].moveNodeId;
         const moveBeforeId = moved[m].moveBeforeId;
-
         const nodeToMove = this.#templateItem.getNode(moveNodeId); 
     
         if(moveBeforeId !== null){
@@ -836,31 +831,11 @@ class ContainerComponent extends HTMLElement {
         }  
       }
  
-      const updates = data?.updates?.[this.#templateItem.dataFieldName];
-
-      if(!updates){
-        return;
-      }
-
-      const componentConfig = PresentationComponent
-          .presentationComponents[this.#templateItem.templateName]
-
-      const templateSignals = componentConfig.templateSignals;
-     
-      //TODO: Move this logic.
-      if(!this.#templateItem.signalMapCache){
-        this.#templateItem.signalMapCache = {};
-
-        for(let i=0;i<templateSignals.length;i++){
-          this.#templateItem.signalMapCache[templateSignals[i].fieldName] =
-            templateSignals[i];
-        }
-      }
+      const updates = data?.updates?.[this.#templateItem.dataFieldName] ?? [];
 
       for(let i=0;i<updates.length;i++){
 
         let attrName,attrValue,id;
-
       
         Object.keys(updates[i]).forEach((key)=>{
             if(key === "id"){
@@ -874,7 +849,7 @@ class ContainerComponent extends HTMLElement {
         if(id){
  
           const updateConfig = { 
-              signalConfig: this.#templateItem.signalMapCache[attrName],
+              signalConfig: this.#templateItem.getSignal(attrName),
               updateData: {
                 "signalData":{[attrName]:attrValue},
                 "elementRoot": this.#templateItem.getNode(id)
@@ -1126,8 +1101,8 @@ class DataStore {
 
     let changeData = {}; 
  
-    this.#presentationUpdates["removed"] = null;
-    this.#presentationUpdates["added"] = null;
+    this.#presentationUpdates["removed"] = []
+    this.#presentationUpdates["added"] = []
     this.#presentationUpdates["moved"] = null;
     this.#presentationUpdates["updated"] = null;
     this.#presentationUpdates["isClear"] = null;
