@@ -623,7 +623,7 @@ class ContainerComponent extends HTMLElement {
 
    
     if (attr === "textcontent"){
-      element.innerHTML = updated;
+      element.textContent = updated;
     } else if(attr==="innerHTML"){
       element.textContent = updated;
     } else {
