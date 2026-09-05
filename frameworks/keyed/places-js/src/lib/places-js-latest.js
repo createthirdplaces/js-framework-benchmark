@@ -101,7 +101,7 @@ class ApiLoadAction{
         return await response.json();
       }
 
-      //Clear cache because there was a likely data update.
+      //Cjlear cache because there was a likely data update.
       if(queryConfig.method !== "GET"){
        for(let i = 0; i< sessionStorage.length; i++){
           const key = sessionStorage.key(i);
@@ -119,6 +119,9 @@ class TemplateItem {
  
   #clickTemplateEvents;
   #changeTemplateEvents;
+ 
+  #clickTemplateHandlers;
+  #changeTemplateHandlers;
 
   #handlerDepthMap = {};
   #nodes = {}
@@ -133,12 +136,46 @@ class TemplateItem {
   constructor(html){
     this.#defineComponent(html);
   }
-   
+ 
+  static init(componentHtml){
+    let template = new TemplateItem(componentHTML)
+    const obj = new item.prototype.constructor(); 
+    obj.#defineComponent();
+  }
+  
   #initSignalMap(){
     for(let i=0;i<this.#templateSignals.length;i++){
       this.#signalMap[this.#templateSignals[i].fieldName] =
         this.#templateSignals[i];
     }
+  }
+
+  setupEventHandlers(events){
+
+    if(events){
+      this.#clickTemplateHandlers = events;
+
+      this.#templateRoot.addEventListener("click",(e)=>{
+        
+        const clickId = e.target.getAttribute("data-click-id")
+                || e.target.parentNode.getAttribute("data-click-id") 
+                || e.target.parentNode.parentNode.getAttribute("data-click-id") 
+
+        if(clickId){
+
+          const key = "data-click-id_"+clickId;
+          const componentId 
+            = this.getItemIdForEvent({
+                "eventItem":e.target,
+                "key":key});
+        
+          const handlerName = this.#clickTemplateEvents[clickId];
+          this.#clickTemplateHandlers[handlerName]({
+            "componentId":componentId
+          });
+        } 
+      });
+    }  
   }
 
   getSignalByFieldName(fieldName){
@@ -152,7 +189,10 @@ class TemplateItem {
     const clickEvents = [];
     const clickHandlers = {};
     const start = Date.now();
- 
+
+    const clickSplitRegex = new RegExp("onclick=\"{{","i");
+    const changeSplitRegex = new RegExp("onchange=\"{{","i");
+    
     this.#templateSignals = [];
     
     let template = document.createElement("template"); 
@@ -161,22 +201,24 @@ class TemplateItem {
      * This logic is running in O(m*n^2) time with repetitive iteration.
      * n is the number of template items and m is the length of the template string.
      * This logic should run in O(m*n) time or better.
-     */   
-    const clickEventsStr = templateStr.split("onClick={{");
+     */  
+
+    const clickEventsStr = templateStr.split(clickSplitRegex);
     if(clickEventsStr.length > 1){
       for(let i=1;i<clickEventsStr.length;i++){
-        const j = clickEventsStr[i].indexOf("}}");
+        const j = clickEventsStr[i].indexOf("}}\"");
         
         const splitStr = clickEventsStr[i].slice(0,j);
         clickEvents.push(splitStr);
-        clickEventsStr[i] = `data-click-id=${i-1}` + clickEventsStr[i].slice(j+2);
+        clickEventsStr[i] = `data-click-id=${i-1}` + clickEventsStr[i].slice(j+3);
       }
 
       templateStr = clickEventsStr.join("");    
     }
 
-    const changeEventsStr = templateStr.split("onChange={{");
+    const changeEventsStr = templateStr.split(changeSplitRegex);
     if(changeEventsStr.length > 1){
+      console.warn("Change events not implemented yet");
       for(let i=1;i<changeEventsStr.length;i++){ 
         const j = changeEventsStr[i].indexOf("}}"); 
         
@@ -187,8 +229,9 @@ class TemplateItem {
       templateStr = changeEventsStr.join("");
     }
 
-    this.#changeTemplateEvents = changeEvents;
+   
     this.#clickTemplateEvents = clickEvents;
+    this.#changeTemplateEvents = changeEvents;
 
     const signalIds = [];
 
@@ -299,13 +342,15 @@ class TemplateItem {
     templateStr = linesToAdd.join("");
     template.innerHTML = templateStr;
     
+    this.#templateNode = template.content.firstChild;
+    
     const handlerAttrs = ["data-click-id","data-change-id"];
 
     handlerAttrs.forEach((handlerAttr)=>{
-      
+     
       const attrSelector = `[${handlerAttr}]`; 
  
-      template
+      this.#templateNode
         .querySelectorAll(attrSelector)
         .forEach((node)=>{
 
@@ -322,7 +367,8 @@ class TemplateItem {
           this.#handlerDepthMap[handlerDepthKey] = depth;  
         });
     });
-   
+  
+
     for(let i=0; i<this.#templateSignals.length; i++){
       
       const signal = this.#templateSignals[i];
@@ -352,7 +398,6 @@ class TemplateItem {
       }
     }
 
-    this.#templateNode = template.content.firstChild;
     this.#initSignalMap();
 
     //Tenplate parsing needs to be optimized for performance.
@@ -377,14 +422,18 @@ class TemplateItem {
     const code = str.charCodeAt(0);
     return (code > 64 && code < 91) || (code > 96 && code < 123)
   }
-  
-  static init(componentHtml){
+   
+  setDataField(dataField){
+    this.dataField = dataField;
+  }
 
-    let template = new TemplateItem(componentHTML)
-    const obj = new item.prototype.constructor(); 
-    obj.#defineComponent();
+  getDataField(){
+    return this.dataField; 
+  }
 
-  } 
+  setId(id){
+    this.id = id;
+  }
   
   setTemplateName(templateName){
     this.templateName = templateName.toUpperCase();
@@ -393,7 +442,11 @@ class TemplateItem {
   setTemplateRoot(root){
     this.#templateRoot = root;
   }
- 
+
+  appendNode(node){
+    this.#templateRoot.appendChild(node);
+  }
+  
   appendChild(fragment){
     this.#templateRoot.appendChild(fragment);
   }
@@ -418,8 +471,11 @@ class TemplateItem {
     this.#templateRoot.replaceChildren([]);
     this.#nodes = {};
   }
-}
 
+  setTemplateHtml(html){
+    this.#templateRoot.innerHTML = html;
+  }
+}
 
 class UserEventComponent extends HTMLElement {
 
@@ -481,7 +537,6 @@ class ContainerComponent extends HTMLElement {
   #componentStore = {};
 
   #templateItem;
-  #templateLoaded = false;
 
   //HTML before loading animiation.
   #htmlBeforeLoading;
@@ -566,9 +621,9 @@ class ContainerComponent extends HTMLElement {
       }
     }
 
-    
-    if (attr === "textContent"){
-      element.textContent = updated;
+   
+    if (attr === "textcontent"){
+      element.innerHTML = updated;
     } else if(attr==="innerHTML"){
       element.textContent = updated;
     } else {
@@ -730,12 +785,12 @@ class ContainerComponent extends HTMLElement {
     let templateHTML = templateNode ? templateNode.innerHTML : this.innerHTML;
     this.#templateItem = new TemplateItem(templateHTML); 
 
-
-    console.error("Template root not set");
     templateNode.innerHTML = "";
-    this.#templateItem.dataField = templateNode.getAttributeNode("data-template").value
-    this.#templateItem.id =  `template-${ContainerComponent.templateCount}`
+    this.#templateItem.setTemplateRoot(templateNode);
+    this.#templateItem.setDataField(templateNode.getAttributeNode("data-template").value);
+    this.#templateItem.setId(`template-${ContainerComponent.templateCount}`);
     this.#templateItem.setTemplateName(this.nodeName);
+    this.#templateItem.setupEventHandlers(this.#clickTemplateEvents);
   }
   
   #renderTemplate(data) {
@@ -749,14 +804,16 @@ class ContainerComponent extends HTMLElement {
       let state = data[this.#templateItem.dataFieldName] || []; 
  
       if(data?.fieldTypeMapping?.[this.#templateItem.dataFieldName] === "item"){ 
+        console.log("Single update");
         this.#updateSingleItemTemplate(this.#templateItem,data);  
         return;
       }
 
+      let hasReplaced = false;
       const added = data["added"];
 
       if(added?.length > 0){
- 
+
         const templateNode = this.#templateItem.getTemplateNode();
 
         for(let j=0;j<added.length;j++){
@@ -770,7 +827,7 @@ class ContainerComponent extends HTMLElement {
             const addNode = templateNode.cloneNode(true);          
 
             addNode.data_id = insertData[k].id;
-            
+           
             this.#templateItem.addNode(insertData[k].id,addNode);
             const fieldNames = Object.keys(insertData[k]);
 
@@ -785,8 +842,7 @@ class ContainerComponent extends HTMLElement {
                   }
                 }
               )
-            }
-           
+            } 
             addFragment.appendChild(addNode);
           }
 
@@ -803,12 +859,14 @@ class ContainerComponent extends HTMLElement {
 
       if(removed.size > 0) { 
 
-				if(data["isClear"] && !hasReplaced){
+				if(data["isClear"] && !data["isReplace"]){
           this.#templateItem.clearNodes();
         }
-        removed.forEach((id)=>{ 
-          this.#templateItem.removeChild(id);
-        });
+        else {
+          removed.forEach((id)=>{ 
+            this.#templateItem.removeChild(id);
+          });
+        }
       }
 
       const moved = data["moved"] || [];
@@ -830,8 +888,9 @@ class ContainerComponent extends HTMLElement {
           nodeToMove.parentNode.appendChild(nodeToMove);
         }  
       }
- 
-      const updates = data?.updates?.[this.#templateItem.dataFieldName] ?? [];
+
+      
+      const updates = data?.updates?.[this.#templateItem.getDataField()] ?? [];
 
       for(let i=0;i<updates.length;i++){
 
@@ -849,7 +908,7 @@ class ContainerComponent extends HTMLElement {
         if(id){
  
           const updateConfig = { 
-              signalConfig: this.#templateItem.getSignal(attrName),
+              signalConfig: this.#templateItem.getSignalByFieldName(attrName),
               updateData: {
                 "signalData":{[attrName]:attrValue},
                 "elementRoot": this.#templateItem.getNode(id)
@@ -861,11 +920,11 @@ class ContainerComponent extends HTMLElement {
       }
     }
   }
-  
+ 
   #generateAndSaveHTML(data) {
 
-    //Don't re-render static HTML if templates are being used.
-    if(!this.#templateLoaded){
+    //Don't re-render static HTML if a template is being used.
+    if(!this.#templateItem){
       if(this.#loadingStarted > 0){
 
         const current = Date.now();
@@ -893,10 +952,8 @@ class ContainerComponent extends HTMLElement {
       else {
         this.innerHTML =  this.render(data);
       }
-
       this.#renderTemplate(data);
 		} else {
-
       if(this.#htmlBeforeLoading){
         this.innerHTML = this.#htmlBeforeLoading;  
       }
@@ -1170,7 +1227,7 @@ class DataStore {
           if(addFragment !== null){
               addFragments.push({
                 "insertBefore": -1,
-                "insertData":addFragment,
+                "insertData":addFragment, 
             })
             isReplace = true;
           } 
@@ -1281,7 +1338,6 @@ class DataStore {
    });
 
     this.#presentationUpdates["fieldTypeMapping"] = this.#fieldTypeMapping
-
     this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
 
     Object.keys(storeUpdates).forEach((field)=>{
