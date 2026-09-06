@@ -1,6 +1,6 @@
-import {UserEventComponent} from "./lib/places-js-latest.js";
+import {StaticComponent} from "./lib/places-js-latest.js";
 import {store} from './store.js';
-export class EventHandlerComponent extends UserEventComponent {
+export class EventHandlerComponent extends StaticComponent {
   constructor(){
     super();
     this.setClickEvents({

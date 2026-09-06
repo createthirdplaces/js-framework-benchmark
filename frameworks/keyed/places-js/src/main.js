@@ -1,7 +1,7 @@
-import {ContainerComponent,CustomLoadAction,DataStore} from "./lib/places-js-latest.js";
+import {CustomLoadAction,DataStore,PresentationComponent} from "./lib/places-js-latest.js";
 import {store} from "./store.js"
 
-export class MainElement extends ContainerComponent {
+export class MainElement extends PresentationComponent {
   constructor(){
     super([{
         dataStore:store

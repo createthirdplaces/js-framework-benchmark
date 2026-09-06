@@ -156,7 +156,8 @@ class TemplateItem {
       this.#clickTemplateHandlers = events;
 
       this.#templateRoot.addEventListener("click",(e)=>{
-        
+       
+
         const clickId = e.target.getAttribute("data-click-id")
                 || e.target.parentNode.getAttribute("data-click-id") 
                 || e.target.parentNode.parentNode.getAttribute("data-click-id") 
@@ -328,18 +329,21 @@ class TemplateItem {
     const linesToAdd = [];
     for(let i=0;i<split.length;i++){
 
+
+      split[i]=split[i].trim();
       ///Remove empty lines because they will
       //be interpreted as empty text noddes.
       if(split[i].length > 0){
-        split[i]=split[i].trim();
         //Insert space for attributes
         if(!split[i].endsWith(">")) {
           split[i]=split[i]+" ";
         }
+        
         linesToAdd.push(split[i]);
       }
     }
     templateStr = linesToAdd.join("");
+
     template.innerHTML = templateStr;
     
     this.#templateNode = template.content.firstChild;
@@ -475,9 +479,13 @@ class TemplateItem {
   setTemplateHtml(html){
     this.#templateRoot.innerHTML = html;
   }
+
+  getTemplateHtml(){
+    return this.#templateNode.innerHTML;
+  }
 }
 
-class UserEventComponent extends HTMLElement {
+class StaticComponent extends HTMLElement {
 
   static #clickSplitRegex = new RegExp("onclick=\"{{","i");
   #handlerMap = {};
@@ -485,7 +493,7 @@ class UserEventComponent extends HTMLElement {
   constructor(){
     super();
    
-    const split = this.innerHTML.split(UserEventComponent.#clickSplitRegex);
+    const split = this.innerHTML.split(StaticComponent.#clickSplitRegex);
     for(let i=1; i<split.length; i++){
       const sectionSplit = split[i].split("}}");
       const handlerName = sectionSplit[0];
@@ -496,7 +504,7 @@ class UserEventComponent extends HTMLElement {
  
 
   setClickEvents(handlerConfig){
- 
+
     const clickSelectorName = `data-${this.nodeName.toLowerCase()}-click`;
 
     this
@@ -521,7 +529,7 @@ class UserEventComponent extends HTMLElement {
   }
 }
 
-class ContainerComponent extends HTMLElement {
+class PresentationComponent extends HTMLElement {
 
   #componentIsRendering = false;
   #loadingFromStores = new Set();
@@ -543,7 +551,7 @@ class ContainerComponent extends HTMLElement {
 
   #lightDomHTML = "<p>Use light DOM or render() method to show HTML</p>";
 
-  #selectorCache = {};
+  #selectorCache = new Map();
  
   static #templateCount = 0;
   
@@ -552,6 +560,7 @@ class ContainerComponent extends HTMLElement {
 
   #changeTemplateItemHandlers = {};
   #clickTemplateItemHandlers = {};
+
 
   static clickHandlerCount = 0;
   static changeHandlerCount = 0;
@@ -607,27 +616,24 @@ class ContainerComponent extends HTMLElement {
       elementRoot
 		} = params.updateData;
     
-    let updated = signalData[fieldName] 
     let element = elementRoot;
 
     if(!isOuter){       
       const cacheId = `${elementRoot.data_id}-${signalId}`;
 
-      if(!(cacheId in this.#selectorCache)){
+      if(!(this.#selectorCache.has(cacheId))){
         element=element.querySelector(signalPath);
-        this.#selectorCache[cacheId] = element;
+        this.#selectorCache.set(cacheId,element);
       } else {
-        element = this.#selectorCache[cacheId];
+        element = this.#selectorCache.get(cacheId);
       }
     }
 
    
-    if (attr === "textcontent"){
-      element.textContent = updated;
-    } else if(attr==="innerHTML"){
-      element.textContent = updated;
-    } else {
-      element.setAttribute(attr,`${updated}`);
+    if (attr === "textcontent" || attr==="innerHTML"){
+      element.textContent = signalData[fieldName];
+    }  else {
+      element.setAttribute(attr,`${signalData[fieldName]}`);
     }
   }
 
@@ -646,7 +652,7 @@ class ContainerComponent extends HTMLElement {
       this.#loadingFromStores.add(dataStore);
     }
 
-		// Save the timestamp for when the loading started.
+		
     if(this.#loadingStarted === 0){
       this.#loadingStarted = Date.now();
     }
@@ -781,14 +787,14 @@ class ContainerComponent extends HTMLElement {
   #setupTemplate(){
       
     let templateNode = this.querySelector("[data-template]");
-
+    
     let templateHTML = templateNode ? templateNode.innerHTML : this.innerHTML;
     this.#templateItem = new TemplateItem(templateHTML); 
 
     templateNode.innerHTML = "";
     this.#templateItem.setTemplateRoot(templateNode);
-    this.#templateItem.setDataField(templateNode.getAttributeNode("data-template").value);
-    this.#templateItem.setId(`template-${ContainerComponent.templateCount}`);
+    this.#templateItem.setDataField(templateNode?.getAttributeNode("data-template").value);
+    this.#templateItem.setId(`template-${PresentationComponent.templateCount}`);
     this.#templateItem.setTemplateName(this.nodeName);
     this.#templateItem.setupEventHandlers(this.#clickTemplateEvents);
   }
@@ -801,35 +807,30 @@ class ContainerComponent extends HTMLElement {
 
     if(this.#templateItem){
 
-      let state = data[this.#templateItem.dataFieldName] || []; 
- 
       if(data?.fieldTypeMapping?.[this.#templateItem.dataFieldName] === "item"){ 
-        console.log("Single update");
         this.#updateSingleItemTemplate(this.#templateItem,data);  
         return;
       }
 
       let hasReplaced = false;
-      const added = data["added"];
 
-      if(added?.length > 0){
+      if(data["added"].length > 0){
 
         const templateNode = this.#templateItem.getTemplateNode();
 
-        for(let j=0;j<added.length;j++){
+        for(let j=0;j<data["added"].length;j++){
 
-          const insertBefore = added[j].insertBefore;
-          const insertData = added[j].insertData;
+          const {insertBefore,insertData} = data["added"][j];
 
           let addFragment = document.createDocumentFragment();
-          
+         
+          const fieldNames = Object.keys(insertData[0]);
           for(let k=0;k<insertData.length;k++){
             const addNode = templateNode.cloneNode(true);          
 
             addNode.data_id = insertData[k].id;
            
             this.#templateItem.addNode(insertData[k].id,addNode);
-            const fieldNames = Object.keys(insertData[k]);
 
             for(let a=0;a<fieldNames.length;a++){
                  
@@ -855,26 +856,37 @@ class ContainerComponent extends HTMLElement {
         }
       }
       
-      const removed = data["removed"] || [];
 
-      if(removed.size > 0) { 
+      if(data["removed"].size > 0) { 
 
 				if(data["isClear"] && !data["isReplace"]){
           this.#templateItem.clearNodes();
         }
         else {
-          removed.forEach((id)=>{ 
+          data["removed"].forEach((id)=>{ 
             this.#templateItem.removeChild(id);
           });
         }
+
+        setTimeout(()=>{
+
+          if(data["isClear"]){
+            this.#selectorCache.clear();
+          } else{ 
+            for(const [key,value] of this.#selectorCache){
+              const nodeId = key.split("-")[0];
+              if(data["removed"].has(nodeId)){
+                this.#selectorCache.delete(key);
+              }
+            }
+          }
+        },0);
       }
 
-      const moved = data["moved"] || [];
 
-      for(let m=0; m<moved.length; m++){
-       
-        const moveNodeId = moved[m].moveNodeId;
-        const moveBeforeId = moved[m].moveBeforeId;
+      for(let m=0; m<data["moved"].length; m++){
+      
+        const {moveNodeId,moveBeforeId} = data["moved"][m]
         const nodeToMove = this.#templateItem.getNode(moveNodeId); 
     
         if(moveBeforeId !== null){
@@ -1023,6 +1035,11 @@ class DataStore {
 
     DataStore.#storeRegistry[storeName] = this;
     DataStore.#storeCount++;
+
+    this.#presentationUpdates["removed"] = []
+    this.#presentationUpdates["added"] = []
+    this.#presentationUpdates["moved"] = []
+    this.#presentationUpdates["updated"] = []
   }
 
   /**
@@ -1031,6 +1048,9 @@ class DataStore {
    */
   setupPresentationSignals(presentationSignals){
     this.#presentationSignals = presentationSignals;
+    Object.keys(presentationSignals).forEach((key)=>{
+      this.#prevOrdering[key]=[];
+    });
   } 
 
   #generatePresentationUpdates(updates){
@@ -1147,7 +1167,7 @@ class DataStore {
    */
   updateStoreData(storeUpdates){
 
-
+  
     //Logic that should only run if reactivity is not enabled for store
     if(!this.#presentationSignals){
       for(let i = 0; i < this.#componentSubscriptions.length; i++){
@@ -1157,11 +1177,12 @@ class DataStore {
     }
 
     let changeData = {}; 
- 
+    
     this.#presentationUpdates["removed"] = []
     this.#presentationUpdates["added"] = []
-    this.#presentationUpdates["moved"] = null;
-    this.#presentationUpdates["updated"] = null;
+    this.#presentationUpdates["moved"] = []
+    this.#presentationUpdates["updated"] = []
+
     this.#presentationUpdates["isClear"] = null;
     this.#presentationUpdates["isReplace"] = null;
     
@@ -1179,11 +1200,13 @@ class DataStore {
         const prevIds = new Set();
         const newIds = new Set();
 
+        this.#presentationUpdates["removed"] = new Set(dataItemOld);        
         let sameLocs = true;
         for(let num=0;num<Math.max(dataItem.length,dataItemOld.length);num++){
           if(num<dataItem.length){
             updatedOrdering.push(dataItem[num].id);
             newIds.add(dataItem[num].id);
+            this.#presentationUpdates["removed"].delete(dataItem[num].id);
           }
           if(num < dataItemOld.length){
             prevIds.add(dataItemOld[num]);
@@ -1195,9 +1218,15 @@ class DataStore {
        
         let isReplace = false;
 
-        this.#presentationUpdates["removed"] = sameLocs ? new Set(): prevIds.difference(newIds);
+        let added = new Set();
         
-        const added = sameLocs ? new Set(): newIds.difference(prevIds);
+        if(!sameLocs) {
+          if(prevIds.size === 0){
+            added = newIds;
+          } else {
+            added = sameLocs ? new Set(): newIds.difference(prevIds);
+          }
+        }
         
         if(added.size > 0){
           
@@ -1440,4 +1469,4 @@ class DataStore {
   }
 }
 
-export { ApiLoadAction, ContainerComponent, ShadowDOMComponent, CustomLoadAction, DataStore, UserEventComponent};
+export { ApiLoadAction, PresentationComponent, ShadowDOMComponent, StaticComponent, CustomLoadAction, DataStore};

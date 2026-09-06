@@ -6,6 +6,10 @@ function _random(max) {
 
 class Store extends DataStore {
 
+  static #adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
+  static #colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
+  static #nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
+        
   id=1;
 
   constructor(loadAction,storeName){
@@ -40,12 +44,12 @@ class Store extends DataStore {
   }
   
   buildData(count = 1000) {
-        var adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
-        var colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
-        var nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
         var data = [];
         for (var i = 0; i < count; i++)
-            data.push({id: this.id++, label: adjectives[_random(adjectives.length)] + " " + colours[_random(colours.length)] + " " + nouns[_random(nouns.length)] });
+            data.push({
+              id: this.id++, 
+              label: Store.#adjectives[_random(Store.#adjectives.length)] + " " + Store.#colours[_random(Store.#colours.length)] + " " + Store.#nouns[_random(Store.#nouns.length)]
+            });
       return data;
     }
     
@@ -104,7 +108,6 @@ class Store extends DataStore {
     }
     
     swapRows() {
-      console.log("Swap rows");
       let data = [...this.getStoreData().data];
 
       if(data.length > 998) {
