@@ -4,7 +4,7 @@ function _random(max) {
   return Math.round(Math.random()*1000)%max;
 }
 
-class Store extends DataStore {
+export class Store extends DataStore {
 
   static #adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
   static #colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
@@ -40,7 +40,6 @@ class Store extends DataStore {
     }
     
     this.setupPresentationSignals(presentationSignals);
-    
   }
   
   buildData(count = 1000) {

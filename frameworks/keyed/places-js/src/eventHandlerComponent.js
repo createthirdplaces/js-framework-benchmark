@@ -1,5 +1,6 @@
 import {StaticComponent} from "./lib/places-js-latest.js";
 import {store} from './store.js';
+
 export class EventHandlerComponent extends StaticComponent {
   constructor(){
     super();

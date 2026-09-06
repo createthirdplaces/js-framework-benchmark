@@ -151,31 +151,47 @@ class TemplateItem {
   }
 
   setupEventHandlers(events){
-
+    
     if(events){
       this.#clickTemplateHandlers = events;
 
-      this.#templateRoot.addEventListener("click",(e)=>{
-       
+      (function(templateRoot,handlerDepthMap,clickTemplateEvents,clickTemplateHandlers){
 
-        const clickId = e.target.getAttribute("data-click-id")
-                || e.target.parentNode.getAttribute("data-click-id") 
-                || e.target.parentNode.parentNode.getAttribute("data-click-id") 
+       const getItemIdForEvent = ({eventItem,key}) =>{
+          const depth = handlerDepthMap[key];
 
-        if(clickId){
+          for(let i=0; i<depth;i++){
+            eventItem = eventItem.parentNode;
+          }
+          
+          return eventItem.data_id;
+        }
 
-          const key = "data-click-id_"+clickId;
-          const componentId 
-            = this.getItemIdForEvent({
-                "eventItem":e.target,
-                "key":key});
-        
-          const handlerName = this.#clickTemplateEvents[clickId];
-          this.#clickTemplateHandlers[handlerName]({
-            "componentId":componentId
-          });
-        } 
-      });
+        templateRoot.addEventListener("click",(e)=>{
+         
+
+          const clickId = e.target.getAttribute("data-click-id")
+                  || e.target.parentNode.getAttribute("data-click-id") 
+                  || e.target.parentNode.parentNode.getAttribute("data-click-id") 
+
+          if(clickId){
+
+            const key = "data-click-id_"+clickId;
+            const componentId 
+              = getItemIdForEvent({
+                  "eventItem":e.target,
+                  "key":key});
+          
+            const handlerName = clickTemplateEvents[clickId];
+            clickTemplateHandlers[handlerName]({
+              "componentId":componentId
+            });
+          } 
+        });
+      })(this.#templateRoot, this.#handlerDepthMap,this.#clickTemplateEvents, this.#clickTemplateHandlers)
+
+
+     
     }  
   }
 
@@ -412,15 +428,6 @@ class TemplateItem {
     }
   }
 
-  getItemIdForEvent({eventItem,key}){
-    const depth = this.#handlerDepthMap[key];
-
-    for(let i=0; i<depth;i++){
-      eventItem = eventItem.parentNode;
-    }
-    
-    return eventItem.data_id;
-  }
 
   isAttributeChar(str){
     const code = str.charCodeAt(0);
@@ -473,7 +480,12 @@ class TemplateItem {
    
   clearNodes() { 
     this.#templateRoot.replaceChildren([]);
-    this.#nodes = {};
+    setTimeout(()=>{
+      Object.keys(this.#nodes).forEach((id)=>{
+        this.#nodes[id] = null;
+      });
+      this.#nodes = {};
+    },0);
   }
 
   setTemplateHtml(html){
