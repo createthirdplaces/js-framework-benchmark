@@ -1047,6 +1047,230 @@ class DataStore {
     Object.keys(presentationSignals).forEach((key)=>{
       this.#prevOrdering[key]=[];
     });
+
+		const reactiveUpdates = (storeUpdates)=> {
+			let changeData = {}; 
+			
+			this.#presentationUpdates["removed"] = []
+			this.#presentationUpdates["moved"] = []
+			this.#presentationUpdates["updated"] = []
+
+			
+			Object.keys(storeUpdates).forEach((field)=>{
+						 
+				if(Array.isArray(storeUpdates[field])){
+					
+					this.#fieldTypeMapping[field] = "array";
+
+					const dataItem = storeUpdates[field]; 
+					const dataItemOld = this.#prevOrdering[field] ||[] ;
+				 
+					const updatedOrdering = [];
+				
+					const prevIds = new Set();
+					const newIds = new Set();
+
+					this.#presentationUpdates["removed"] = new Set(dataItemOld);        
+					let sameLocs = true;
+					for(let num=0;num<Math.max(dataItem.length,dataItemOld.length);num++){
+						if(num<dataItem.length){
+							updatedOrdering.push(dataItem[num].id);
+							newIds.add(dataItem[num].id);
+							this.#presentationUpdates["removed"].delete(dataItem[num].id);
+						}
+						if(num < dataItemOld.length){
+							prevIds.add(dataItemOld[num]);
+						}
+						if(!dataItem[num] || dataItem[num].id !==dataItemOld[num]){
+							sameLocs = false; 
+						}
+					}
+				 
+					let isReplace = false;
+
+					let added = new Set();
+					
+					if(!sameLocs) {
+						if(prevIds.size === 0){
+							added = newIds;
+						} else {
+							added = sameLocs ? new Set(): newIds.difference(prevIds);
+						}
+					}
+					
+					if(added.size > 0){
+						
+						let addFragments = [];
+						let addFragment = null;
+
+						for(let num=0; num < updatedOrdering.length; num++){
+							const id = updatedOrdering[num];
+
+							if(added.has(id)){
+
+								if(addFragment === null){
+									addFragment = [];
+								}
+								addFragment.push(dataItem[num]);
+							} else {
+
+								if(addFragment !== null){
+									addFragments.push({
+										"insertBefore":num,
+										"insertData":addFragment
+									})
+									addFragment = null;
+								}
+							}
+						}
+						if(addFragment !== null){
+								addFragments.push({
+									"insertBefore": -1,
+									"insertData":addFragment, 
+							})
+							isReplace = true;
+						} 
+						this.#prevOrdering[field]=updatedOrdering;
+						
+						for(let i = 0; i < this.#componentSubscriptions.length; i++){
+							this.#componentSubscriptions[i].addItems(addFragments);
+						}
+
+					}
+
+					this.#presentationUpdates["moved"] = [];
+					
+					if(!updatedOrdering || updatedOrdering.length === 0){
+						this.#presentationUpdates["isClear"] = true;
+					}
+				 
+					if(this.#presentationUpdates["removed"].size > 0){
+
+						let updatedPrev = [];
+						
+						for(let a=0;a<this.#storeData[field].length;a++){
+							const item = this.#storeData[field][a];
+							if(!this.#presentationUpdates["removed"].has(item.id)){
+								updatedPrev.push(item);
+							}
+						}
+						this.#storeData[field] = updatedPrev;
+						this.#prevOrdering[field]=updatedOrdering;
+						for(let i = 0; i < this.#componentSubscriptions.length; i++){
+							this.#componentSubscriptions[i].removeItems(
+								this.#presentationUpdates["removed"],
+								isReplace,
+								this.#presentationUpdates["isClear"]);
+						}
+					}
+
+					const movedNodes = {}
+					let sameNumber = false;
+					if(!isReplace && updatedOrdering.length === this.#prevOrdering[field].length){
+						sameNumber = true;
+
+						const swapUpdates = [];
+						for(let num=0;num<updatedOrdering.length;num++){
+
+							if(updatedOrdering[num] !== this.#prevOrdering[field][num]){
+
+
+								let insertBefore = null;
+								if (num < updatedOrdering.length -1){
+									insertBefore = updatedOrdering[num+1];
+								}
+
+								this.#presentationUpdates["moved"].push({
+									moveNodeId:updatedOrdering[num],
+									moveBeforeId:insertBefore
+								});
+
+								for(let a =0;a<this.#storeData[field].length;a++){
+									const item = this.#storeData[field][a];
+
+									
+									if(a+1===updatedOrdering[num]){
+
+										if(!(updatedOrdering[num]===insertBefore-1)){
+											swapUpdates.push({
+												"updateIndex":num,
+												"updateData":item
+											})
+										}
+									 
+									}
+								}              
+							}
+						}
+
+						for(let a = 0; a < this.#componentSubscriptions.length; a++){
+							this.#componentSubscriptions[a].swapUpdates(this.#presentationUpdates["moved"]);
+						}
+						for(let a=swapUpdates.length-1;a>=0;a--){
+							const swapItem = swapUpdates[a];
+							this.#storeData[field][swapItem.updateIndex]=swapItem.updateData;
+						} 
+						this.#prevOrdering[field] = updatedOrdering;
+					}
+
+
+					if(sameNumber){
+					 
+						const arrayChanges = [];
+						const reactiveFields = this.#presentationSignals[field]["update"];
+
+						for(let i=0;i<storeUpdates[field].length;i++){
+
+							let oldStateRow = this.#storeData[field][i];
+	 
+							let hasChanged = false;
+							for(let j=0;j<reactiveFields.length;j++){
+								const reactiveName = reactiveFields[j];
+								
+								const oldState = oldStateRow[reactiveName];
+								const newState = storeUpdates[field][i][reactiveName];
+
+								if(oldState !== newState){  
+									hasChanged = true;
+								}
+							}
+
+							if(hasChanged){
+								arrayChanges.push(storeUpdates[field][i]);   
+							}
+						}
+						changeData[field] = arrayChanges;
+					}
+				} else {
+					this.#fieldTypeMapping[field] = "item";
+					changeData[field] = storeUpdates[field];
+				}
+			
+		 });
+
+			this.#presentationUpdates["fieldTypeMapping"] = this.#fieldTypeMapping
+			this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
+
+
+			for(let i = 0; i < this.#componentSubscriptions.length; i++){
+				this.#componentSubscriptions[i].updateVisible(
+					this.#presentationUpdates["updates"]
+				);
+			}
+			
+
+			Object.keys(storeUpdates).forEach((field)=>{
+				this.#storeData[field] = storeUpdates[field]
+			}); 
+
+			for(let i = 0; i < this.#componentSubscriptions.length; i++){
+				this.#componentSubscriptions[i].updateSingleItem(
+					this.#presentationUpdates["updates"]
+				);
+			}	
+
+		}
+		this.updateStoreData = reactiveUpdates;
   } 
 
   #generatePresentationUpdates(updates){
@@ -1161,239 +1385,10 @@ class DataStore {
    * Update data in the store and trigger a render of components subscribed to the store.
    * @param storeUpdates Updated store data. Fields not specified in storeData will not be updated.
    */
-  updateStoreData(storeUpdates){
-
-  
-    //Logic that should only run if reactivity is not enabled for store
-    if(!this.#presentationSignals){
-      for(let i = 0; i < this.#componentSubscriptions.length; i++){
-        this.#componentSubscriptions[i].updateFromSubscribedStores();
-      }
-      return;
-    }
-
-    let changeData = {}; 
-    
-    this.#presentationUpdates["removed"] = []
-    this.#presentationUpdates["moved"] = []
-    this.#presentationUpdates["updated"] = []
-
-    
-    Object.keys(storeUpdates).forEach((field)=>{
-           
-      if(Array.isArray(storeUpdates[field])){
-        
-        this.#fieldTypeMapping[field] = "array";
-
-        const dataItem = storeUpdates[field]; 
-        const dataItemOld = this.#prevOrdering[field] ||[] ;
-       
-        const updatedOrdering = [];
-      
-        const prevIds = new Set();
-        const newIds = new Set();
-
-        this.#presentationUpdates["removed"] = new Set(dataItemOld);        
-        let sameLocs = true;
-        for(let num=0;num<Math.max(dataItem.length,dataItemOld.length);num++){
-          if(num<dataItem.length){
-            updatedOrdering.push(dataItem[num].id);
-            newIds.add(dataItem[num].id);
-            this.#presentationUpdates["removed"].delete(dataItem[num].id);
-          }
-          if(num < dataItemOld.length){
-            prevIds.add(dataItemOld[num]);
-          }
-          if(!dataItem[num] || dataItem[num].id !==dataItemOld[num]){
-            sameLocs = false; 
-          }
-        }
-       
-        let isReplace = false;
-
-        let added = new Set();
-        
-        if(!sameLocs) {
-          if(prevIds.size === 0){
-            added = newIds;
-          } else {
-            added = sameLocs ? new Set(): newIds.difference(prevIds);
-          }
-        }
-        
-        if(added.size > 0){
-          
-          let addFragments = [];
-          let addFragment = null;
-
-          for(let num=0; num < updatedOrdering.length; num++){
-            const id = updatedOrdering[num];
-
-            if(added.has(id)){
-
-              if(addFragment === null){
-                addFragment = [];
-              }
-              addFragment.push(dataItem[num]);
-            } else {
-
-              if(addFragment !== null){
-                addFragments.push({
-                  "insertBefore":num,
-                  "insertData":addFragment
-                })
-                addFragment = null;
-              }
-            }
-          }
-          if(addFragment !== null){
-              addFragments.push({
-                "insertBefore": -1,
-                "insertData":addFragment, 
-            })
-            isReplace = true;
-          } 
-          this.#prevOrdering[field]=updatedOrdering;
-					
-					for(let i = 0; i < this.#componentSubscriptions.length; i++){
-						this.#componentSubscriptions[i].addItems(addFragments);
-					}
-
-        }
-
-        this.#presentationUpdates["moved"] = [];
-        
-        if(!updatedOrdering || updatedOrdering.length === 0){
-          this.#presentationUpdates["isClear"] = true;
-        }
-       
-        if(this.#presentationUpdates["removed"].size > 0){
-
-          let updatedPrev = [];
-          
-          for(let a=0;a<this.#storeData[field].length;a++){
-            const item = this.#storeData[field][a];
-            if(!this.#presentationUpdates["removed"].has(item.id)){
-              updatedPrev.push(item);
-            }
-          }
-          this.#storeData[field] = updatedPrev;
-          this.#prevOrdering[field]=updatedOrdering;
-					for(let i = 0; i < this.#componentSubscriptions.length; i++){
-						this.#componentSubscriptions[i].removeItems(
-							this.#presentationUpdates["removed"],
-							isReplace,
-							this.#presentationUpdates["isClear"]);
-					}
-        }
-
-        const movedNodes = {}
-        let sameNumber = false;
-        if(!isReplace && updatedOrdering.length === this.#prevOrdering[field].length){
-          sameNumber = true;
-
-          const swapUpdates = [];
-          for(let num=0;num<updatedOrdering.length;num++){
-
-            if(updatedOrdering[num] !== this.#prevOrdering[field][num]){
-
-
-              let insertBefore = null;
-              if (num < updatedOrdering.length -1){
-                insertBefore = updatedOrdering[num+1];
-              }
-
-              this.#presentationUpdates["moved"].push({
-                moveNodeId:updatedOrdering[num],
-                moveBeforeId:insertBefore
-              });
-
-              for(let a =0;a<this.#storeData[field].length;a++){
-                const item = this.#storeData[field][a];
-
-                
-                if(a+1===updatedOrdering[num]){
-
-                  if(!(updatedOrdering[num]===insertBefore-1)){
-                    swapUpdates.push({
-                      "updateIndex":num,
-                      "updateData":item
-                    })
-                  }
-                 
-                }
-              }              
-            }
-          }
-
-					for(let a = 0; a < this.#componentSubscriptions.length; a++){
-						this.#componentSubscriptions[a].swapUpdates(this.#presentationUpdates["moved"]);
-					}
-          for(let a=swapUpdates.length-1;a>=0;a--){
-            const swapItem = swapUpdates[a];
-            this.#storeData[field][swapItem.updateIndex]=swapItem.updateData;
-          } 
-          this.#prevOrdering[field] = updatedOrdering;
-        }
-
-
-        if(sameNumber){
-         
-          const arrayChanges = [];
-          const reactiveFields = this.#presentationSignals[field]["update"];
-
-          for(let i=0;i<storeUpdates[field].length;i++){
-
-            let oldStateRow = this.#storeData[field][i];
- 
-            let hasChanged = false;
-            for(let j=0;j<reactiveFields.length;j++){
-              const reactiveName = reactiveFields[j];
-              
-              const oldState = oldStateRow[reactiveName];
-              const newState = storeUpdates[field][i][reactiveName];
-
-              if(oldState !== newState){  
-                hasChanged = true;
-              }
-            }
-
-            if(hasChanged){
-              arrayChanges.push(storeUpdates[field][i]);   
-            }
-          }
-          changeData[field] = arrayChanges;
-        }
-      } else {
-        this.#fieldTypeMapping[field] = "item";
-        changeData[field] = storeUpdates[field];
-      }
-    
-   });
-
-    this.#presentationUpdates["fieldTypeMapping"] = this.#fieldTypeMapping
-    this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
-
-
+  updateStoreData(storeUpdates){ 
 		for(let i = 0; i < this.#componentSubscriptions.length; i++){
-      this.#componentSubscriptions[i].updateVisible(
-				this.#presentationUpdates["updates"]
-			);
-    }
-		
-
-    Object.keys(storeUpdates).forEach((field)=>{
-      this.#storeData[field] = storeUpdates[field]
-    }); 
-
-		for(let i = 0; i < this.#componentSubscriptions.length; i++){
-      this.#componentSubscriptions[i].updateSingleItem(
-				this.#presentationUpdates["updates"]
-			);
-    }	
-
-
-  
+			this.#componentSubscriptions[i].updateFromSubscribedStores();
+		}  
   }
 
   getSubscribedComponents(){
