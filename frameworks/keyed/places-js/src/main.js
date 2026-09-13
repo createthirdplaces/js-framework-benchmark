@@ -1,4 +1,4 @@
-import {CustomLoadAction,DataStore,PresentationComponent} from "./lib/places-js-latest.js";
+import {DataStore,PresentationComponent} from "./lib/places-js-latest.js";
 import {store} from "./store.js"
 
 export class MainElement extends PresentationComponent {
@@ -9,6 +9,7 @@ export class MainElement extends PresentationComponent {
     );
     this.setClickEvents({
       "select": ({componentId})=>{
+        console.log("Selected:");
         store.select(componentId);
       },
       "delete":({componentId})=>{

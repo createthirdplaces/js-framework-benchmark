@@ -1,4 +1,4 @@
-import {CustomLoadAction,DataStore} from "./lib/places-js-latest.js";
+import {CustomLoadSignal,DataStore} from "./lib/places-js-latest.js";
 
 function _random(max) {
   return Math.round(Math.random()*1000)%max;
@@ -137,5 +137,5 @@ const setData = function() {
   }
 };
 
-export const store = new Store((new CustomLoadAction(setData)),"mainStore");
+export const store = new Store(new CustomLoadSignal(setData),"mainStore");
 
