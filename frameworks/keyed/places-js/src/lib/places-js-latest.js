@@ -1,8 +1,8 @@
-(()=>{
+/*(()=>{
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(`* [data-template] { visibility:hidden}`);
   document.adoptedStyleSheets = [sheet];
-})()
+})()*/
 
 /*
  * Don't iniitalize directly. use DataStore.createApiLoadSignal instead
@@ -637,8 +637,8 @@ class TemplateItem {
     this.#templateRoot.replaceChildren([]);
     setTimeout(()=>{
       Object.keys(this.#nodes).forEach((id)=>{
-          this.#nodes[id] = null;
-          });
+        this.#nodes[id] = null;
+      });
       this.#nodes = {};
     },0);
   }
@@ -806,6 +806,9 @@ class PresentationComponent extends HTMLElement {
 
 		this.updateFromSubscribedStores();
 		this.#loadingIndicatorConfig
+    if(this.querySelector("[data-template]")){
+      this.#setupTemplate()
+    }
 	}
 
 	init(initialState){
@@ -1114,6 +1117,7 @@ class PresentationComponent extends HTMLElement {
     }
     else {
       removeData.forEach((id)=>{ 
+        console.log("Removing:"+id);
         this.#templateItem.removeChild(id);
       });
     }
@@ -1152,7 +1156,7 @@ class PresentationComponent extends HTMLElement {
   }
 
   updateVisible(data){
-
+    
     const updates = data[this.#templateItem.dataField] || [];
     for(let i=0;i<updates.length;i++){
 
@@ -1414,7 +1418,7 @@ class DataStore {
 			this.#presentationUpdates["removed"] = []
 			this.#presentationUpdates["moved"] = []
 			this.#presentationUpdates["updated"] = []
-
+      this.#presentationUpdates["isClear"] = false
 			Object.keys(storeUpdates).forEach((field)=>{
 
 				if(Array.isArray(storeUpdates[field])){
@@ -1528,6 +1532,7 @@ class DataStore {
                 updatedPrev.push(item);
               }
             }
+
             this.#storeData[field] = updatedPrev;
             this.#prevOrdering[field]=updatedOrdering;
             for(let i = 0; i < this.#componentSubscriptions.length; i++){
@@ -1626,12 +1631,16 @@ class DataStore {
       }
       //Look at storeUpdates if changeData is empty
       if(changeData.size === 0){
-        changeData = new Map(Object.entries(storeUpdates));
+        changeData = new Map();
+        Object.keys(storeUpdates).forEach((key)=>{
+          if(!Array.isArray(storeUpdates[key])){
+            changeData.set(key,storeUpdates[key]); 
+          }
+        });
       }
       if(changeData.size > 0) {
 
         this.#presentationUpdates["updates"] = this.#generatePresentationUpdates(changeData);
-        
         for(let i = 0; i < this.#componentSubscriptions.length; i++){
           this.#componentSubscriptions[i].updateVisible(
             this.#presentationUpdates["updates"]

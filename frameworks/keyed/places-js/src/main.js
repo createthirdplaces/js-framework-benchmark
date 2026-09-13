@@ -9,7 +9,6 @@ export class MainElement extends PresentationComponent {
     );
     this.setClickEvents({
       "select": ({componentId})=>{
-        console.log("Selected:");
         store.select(componentId);
       },
       "delete":({componentId})=>{
