@@ -850,8 +850,7 @@ class PresentationComponent extends HTMLElement {
 				element = this.#selectorCache.get(cacheId);
 			}
 		}
-
-
+  
     if (attr === "textcontent"){
 			element.textContent = signalData[fieldName];
 		}
@@ -1077,7 +1076,7 @@ class PresentationComponent extends HTMLElement {
       let addFragment = document.createDocumentFragment();
 
       for(let k=0;k<insertData.length;k++){
-        
+       
         const addNode = templateNode.cloneNode(true);          
         const iter = this.#templateItem.getAllSignals();
 
@@ -1091,6 +1090,7 @@ class PresentationComponent extends HTMLElement {
           if(!signalConfig){
             break;
           }
+
           this.#generateSignal({
             signalConfig:signalConfig,
             updateData:{
@@ -1098,13 +1098,13 @@ class PresentationComponent extends HTMLElement {
               "elementRoot":addNode,
             }
           })
-        } 
+        }
         addFragment.appendChild(addNode);
       }
 
       if(insertBefore !== -1){
         const lastNode = this.#templateItem.getNode(insertBefore);
-        lastNode.parentNode.insertBefore(addFragment);
+        lastNode.parentNode.insertBefore(addFragment, lastNode);
       } else {
         this.#templateItem.appendChild(addFragment); 
       }
@@ -1128,7 +1128,7 @@ class PresentationComponent extends HTMLElement {
       } else{ 
         for(const [key,value] of this.#selectorCache){
           const nodeId = key.split("-")[0];
-          if(removeData.has(nodeId)){
+          if(removeData.has(parseInt(nodeId))){
             this.#selectorCache.delete(key);
           }
         }
@@ -1154,8 +1154,12 @@ class PresentationComponent extends HTMLElement {
     }
   }
 
-  updateVisible(data){
-    
+  async updateVisible(data){
+    if(!this.#templateItem){
+      this.#completeLoadAnimation()
+      return;
+    }
+
     const updates = data[this.#templateItem.dataField] || [];
     for(let i=0;i<updates.length;i++){
 
@@ -1493,7 +1497,7 @@ class DataStore {
 
                 if(addFragment !== null){
                   addFragments.push({
-                    "insertBefore":dataItem[num],
+                    "insertBefore":dataItem[num].id,
                     "insertData":addFragment
                   })
                   addFragment = null;
@@ -1689,7 +1693,8 @@ class DataStore {
 
 				let changeData;
 
-				if(update){
+				if((typeof update)=== "function"){
+          //TODO: Add check if state field is array.
 					changeData = update({
             "prevState":this.#storeData[stateField],
             "newState": updates.get(stateField)
@@ -1712,7 +1717,7 @@ class DataStore {
 					presentationUpdates[presentationField] = changeData;
 				} 
 				else {
-					presentationUpdates[presentationField] = changeData[param];
+					presentationUpdates[presentationField] = changeData["param"];
 				}
 			} else {
 				let changeData = [];
