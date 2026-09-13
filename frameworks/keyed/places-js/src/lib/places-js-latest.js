@@ -1117,7 +1117,6 @@ class PresentationComponent extends HTMLElement {
     }
     else {
       removeData.forEach((id)=>{ 
-        console.log("Removing:"+id);
         this.#templateItem.removeChild(id);
       });
     }
