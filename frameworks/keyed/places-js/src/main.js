@@ -3,10 +3,7 @@ import {store} from "./store.js"
 
 export class MainElement extends PresentationComponent {
   constructor(){
-    super([{
-        dataStore:store
-      }]
-    );
+    super();
     this.setClickEvents({
       "select": ({componentId})=>{
         store.select(componentId);

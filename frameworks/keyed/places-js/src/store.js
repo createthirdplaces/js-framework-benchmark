@@ -78,6 +78,7 @@ export class Store extends DataStore {
     }
     
     add() {
+      console.log("Hi");
 			const oldData = this.getStoreData()?.data ?? [];
       this.updateStoreData({
         data: oldData.concat(this.buildData(1000))
@@ -138,5 +139,5 @@ const setData = function() {
   }
 };
 
-export const store = new Store(new CustomLoadSignal(setData),"mainStore");
+export const store = new Store(new CustomLoadSignal(setData),"main-store");
 
