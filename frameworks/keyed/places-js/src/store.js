@@ -1,45 +1,43 @@
-import {CustomLoadSignal,DataStore} from "./lib/places-js-latest.js";
+import {CustomLoadSignal,DataStore, ListUpdater} from "./lib/places-js-latest.js";
 
 function _random(max) {
   return Math.round(Math.random()*1000)%max;
 }
 
+ const presentationSignals = {
+  "selected": {
+    "update":(({prevState,newState,componentUpdate})=>{
+
+      return [
+        {
+          "id":prevState,
+          "selected": ""
+        },
+        {
+          "id":newState,
+          "selected": "danger"
+        }
+      ]
+    }),
+    "presentationField":"data"
+  },
+  "data": {
+    "update": [
+      "label"
+    ]
+  }
+}
 export class Store extends DataStore {
 
   static #adjectives = ["pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint", "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly", "adorable", "important", "inexpensive", "cheap", "expensive", "fancy"];
   static #colours = ["red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black", "orange"];
   static #nouns = ["table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger", "pizza", "mouse", "keyboard"];
-        
+  
+
   id=1;
 
   constructor(loadAction,storeName){
-    super(loadAction, storeName);
-   
-    const presentationSignals = {
-      "selected": {
-        "update":(({prevState,newState,componentUpdate})=>{
-
-          return [
-            {
-              "id":prevState,
-              "selected": ""
-            },
-            {
-              "id":newState,
-              "selected": "danger"
-            }
-          ]
-        }),
-        "presentationField":"data"
-      },
-      "data": {
-        "update": [
-          "label"
-        ]
-      }
-    }
-    
-    this.setupPresentationSignals(presentationSignals);
+    super(loadAction, storeName, new ListUpdater(presentationSignals)); 
   }
   
   buildData(count = 1000) {
