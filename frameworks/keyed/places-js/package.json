@@ -6,10 +6,10 @@
   "js-framework-benchmark": {
     "frameworkVersion": "0.1.0",
     "frameworkHomeURL": "https://createthirdplaces.org/tech/placesjs.html",
-		"issues" :[
-			1139
-		],	
-		"language": "JavaScript"
+    "issues": [
+      1139
+    ],
+    "language": "JavaScript"
   },
   "scripts": {
     "dev": "echo 0",
@@ -25,5 +25,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/krausest/js-framework-benchmark.git"
+  },
+  "dependencies": {
+    "@createthirdplaces/places-js": "npm:@jsr/createthirdplaces__places-js@^0.1.1-dev1",
+    "lit": "^3.3.3"
   }
 }

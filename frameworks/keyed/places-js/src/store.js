@@ -63,10 +63,8 @@ export class Store extends DataStore {
     }
     
     delete(id) {
-      console.log(id);
       const data = [...this.getStoreData().data];
 
-      console.log(this.getStoreData());
       const idx = data.findIndex(d => d.id==id);
       this.updateStoreData({
         data: data.slice(0, idx).concat(data.slice(idx + 1))
@@ -80,7 +78,6 @@ export class Store extends DataStore {
     }
     
     add() {
-      console.log("Hi");
 			const oldData = this.getStoreData()?.data ?? [];
       this.updateStoreData({
         data: oldData.concat(this.buildData(1000))
