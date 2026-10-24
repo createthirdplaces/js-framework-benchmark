@@ -1,15 +1,15 @@
 import {DataStore,PresentationComponent} from "./lib/places-js-latest.js";
-import {store} from "./store.js"
+import {ROW_STORE} from "./store.js"
 
 export class MainElement extends PresentationComponent {
   constructor(){
     super();
     this.setClickEvents({
       "select": ({componentId})=>{
-        store.select(componentId);
+        ROW_STORE.select(componentId);
       },
       "delete":({componentId})=>{
-        store.delete(componentId);
+        ROW_STORE.delete(componentId);
       }
     })
   } 

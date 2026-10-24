@@ -1,5 +1,4 @@
-import {CustomLoadSignal,DataStore, ListUpdater} from "./lib/places-js-latest.js";
-
+import {CustomLoadSignal,DataStore, ListUpdater,EmptyInitializer} from "./lib/places-js-latest.js";
 function _random(max) {
   return Math.round(Math.random()*1000)%max;
 }
@@ -37,7 +36,11 @@ export class Store extends DataStore {
   id=1;
 
   constructor(loadAction,storeName){
-    super(loadAction, storeName, new ListUpdater(presentationSignals)); 
+    super(
+      loadAction, 
+      storeName, 
+      new EmptyInitializer(),
+      new ListUpdater(presentationSignals)); 
   }
   
   buildData(count = 1000) {
@@ -51,10 +54,8 @@ export class Store extends DataStore {
     }
     
     updateData(mod = 10) {
-        // Just assigning setting each tenth this.data doesn't cause a redraw, the following does:
         var newData = [...this.getStoreData().data];
-
-      
+ 
         for (let i = 0; i < newData.length; i += 10) {
             newData[i] = {...newData[i], label:newData[i].label + ' !!!'};
         }
@@ -62,11 +63,14 @@ export class Store extends DataStore {
     }
     
     delete(id) {
-        const data = [...this.getStoreData().data];
-        const idx = data.findIndex(d => d.id==id);
-        this.updateStoreData({
-          data: data.slice(0, idx).concat(data.slice(idx + 1))
-        });
+      console.log(id);
+      const data = [...this.getStoreData().data];
+
+      console.log(this.getStoreData());
+      const idx = data.findIndex(d => d.id==id);
+      this.updateStoreData({
+        data: data.slice(0, idx).concat(data.slice(idx + 1))
+      });
     }
         
     run() {
@@ -137,5 +141,8 @@ const setData = function() {
   }
 };
 
-export const store = new Store(new CustomLoadSignal(setData),"main-store");
+export const ROW_STORE = new Store(
+  new CustomLoadSignal(setData),
+  "main-store",
+);
 
