@@ -242,10 +242,9 @@ class ListUpdater {
 	}
 
   updateStoreData(storeUpdates, subscribers, prevStoreData) {
-    let changeData = new Map();
+		let changeData = new Map();
 
     for (let i = 0; i < this.#listFields.length; i++) {
-
       const field = this.#listFields[i];
 
       if (!storeUpdates[field]) {
@@ -874,7 +873,7 @@ class DataStore {
     if(this.#presentationSubscribers.length >0){
 
       this.#presentationUpdater.updateStoreData(
-        storeUpdates,
+        structuredClone(storeUpdates),
         this.#presentationSubscribers,
         this.#storeData || [],
       );

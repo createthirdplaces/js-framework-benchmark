@@ -1,10 +1,10 @@
 {
   "name": "js-framework-benchmark-keyed-places-js",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Places.js demo",
   "main": "index.js",
   "js-framework-benchmark": {
-    "frameworkVersion": "0.1.0",
+    "frameworkVersion": "0.1.2",
     "frameworkHomeURL": "https://createthirdplaces.org/tech/placesjs.html",
     "issues": [
       1139
@@ -25,9 +25,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/krausest/js-framework-benchmark.git"
-  },
-  "dependencies": {
-    "@createthirdplaces/places-js": "npm:@jsr/createthirdplaces__places-js@^0.1.1-dev1",
-    "lit": "^3.3.3"
   }
 }
